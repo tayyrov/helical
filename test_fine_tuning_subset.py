@@ -37,7 +37,7 @@ print(f"Using device: {device}")
 
 geneformer_config = GeneformerConfig(
     model_name=model_name,
-    batch_size=32,
+    batch_size=4,
     device=device
 )
 geneformer_fine_tune = GeneformerFineTuningModel(
@@ -49,8 +49,8 @@ geneformer_fine_tune = GeneformerFineTuningModel(
 # --------------------------
 # Step 4: Process dataset
 # --------------------------
-dataset = geneformer_fine_tune.process_data(ann_data[:100])
-dataset = dataset.add_column('cell_types', cell_types[:100])
+dataset = geneformer_fine_tune.process_data(ann_data[:10])
+dataset = dataset.add_column('cell_types', cell_types[:10])
 dataset = dataset.map(classes_to_ids, num_proc=4)
 
 split = dataset.train_test_split(test_size=0.2, seed=42)
