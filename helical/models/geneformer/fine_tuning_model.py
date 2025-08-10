@@ -5,6 +5,7 @@ from helical.models.base_models import (
 )
 from helical.models.geneformer import Geneformer, GeneformerConfig
 import torch
+import torch.distributed as dist
 from torch import optim
 from torch.nn.modules import loss
 from helical.models.geneformer.geneformer_utils import (
@@ -240,19 +241,27 @@ class GeneformerFineTuningModel(HelicalBaseFineTuningModel, Geneformer):
         if validation_dataset is not None:
             validation_batch_length = len(validation_dataset)
 
+        # distributed settings
+        distributed = dist.is_available() and dist.is_initialized()
+        rank = dist.get_rank() if distributed else 0
+        world_size = dist.get_world_size() if distributed else 1
+        per_rank_batch_size = self.config["batch_size"]
+        start_index = rank * per_rank_batch_size
+        step_size = per_rank_batch_size * world_size
+
         logger.info("Starting Fine-Tuning")
         for j in range(epochs):
             training_loop = trange(
-                0,
+                start_index,
                 total_batch_length,
-                self.config["batch_size"],
+                step_size,
                 desc="Fine-Tuning",
-                leave=(not silent),
+                leave=(not silent) and (rank == 0),
             )
             batch_loss = 0.0
             batches_processed = 0
             for i in training_loop:
-                max_range = min(i + self.config["batch_size"], total_batch_length)
+                max_range = min(i + per_rank_batch_size, total_batch_length)
 
                 minibatch = train_dataset.select([i for i in range(i, max_range)])
                 max_len = int(max(minibatch["length"]))
@@ -270,10 +279,19 @@ class GeneformerFineTuningModel(HelicalBaseFineTuningModel, Geneformer):
                 )
                 loss = loss_function(outputs, minibatch[label])
                 loss.backward()
+
+                # average gradients across processes for true data parallel training
+                if distributed:
+                    for parameter in self.parameters():
+                        if parameter.grad is not None:
+                            dist.all_reduce(parameter.grad, op=dist.ReduceOp.SUM)
+                            parameter.grad.div_(world_size)
+
                 batch_loss += loss.item()
                 batches_processed += 1
-                training_loop.set_postfix({"loss": batch_loss / batches_processed})
-                training_loop.set_description(f"Fine-Tuning: epoch {j+1}/{epochs}")
+                if rank == 0:
+                    training_loop.set_postfix({"loss": batch_loss / batches_processed})
+                    training_loop.set_description(f"Fine-Tuning: epoch {j+1}/{epochs}")
                 optimizer.step()
                 optimizer.zero_grad()
 
@@ -283,7 +301,8 @@ class GeneformerFineTuningModel(HelicalBaseFineTuningModel, Geneformer):
             if lr_scheduler is not None:
                 lr_scheduler.step()
 
-            if validation_dataset is not None:
+            # Run validation only on rank 0 to avoid duplicated work
+            if validation_dataset is not None and (not distributed or rank == 0):
                 testing_loop = trange(
                     0,
                     validation_batch_length,
