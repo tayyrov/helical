@@ -1,0 +1,13 @@
+Columns in obs: Index(['component', 'stage', 'sex', 'sort.ids', 'fetal.ids', 'orig.dataset',
+       'sequencing.type', 'lanes', 'LVL1', 'LVL2', 'LVL3',
+       'LVL3_for_embryo_study'],
+      dtype='object')
+                       component  ...           LVL3_for_embryo_study
+AAACCTGAGACTAGGC-1-1-3  Membrane  ...         yolksac only - endoderm
+AAACCTGAGAGACGAA-1-1-3  Membrane  ...  fibroblast progenitors PDGFRA+
+AAACCTGAGGCCCTTG-1-1-3  Membrane  ...         yolksac only - endoderm
+AAACCTGAGTCTCGGC-1-1-3  Membrane  ...           erythroid HBE1+GATA1+
+AAACCTGCACCGCTAG-1-1-3  Membrane  ...           erythroid HBE1+GATA1+
+
+[5 rows x 12 columns]
+Using device: cuda
