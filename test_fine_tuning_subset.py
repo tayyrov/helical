@@ -52,11 +52,12 @@ if torch.cuda.device_count() > 1:
     geneformer_fine_tune.config["batch_size"] *= torch.cuda.device_count()
 # -----------------------
 
-# Process the whole dataset
-dataset = geneformer_fine_tune.process_data(ann_data)
+# Process the subset of dataset
+dataset = geneformer_fine_tune.process_data(ann_data[:10])
+
 
 # Add 'cell_types' column
-dataset = dataset.add_column('cell_types', cell_types)
+dataset = dataset.add_column('cell_types', cell_types[:10])
 
 # Convert classes to IDs
 dataset = dataset.map(classes_to_ids, num_proc=4)
