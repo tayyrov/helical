@@ -33,7 +33,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using device: {device}")
 
 # Create config with device
-geneformer_config = GeneformerConfig(model_name="gf-12L-95M-i4096", batch_size=32, device=device)
+geneformer_config = GeneformerConfig(model_name="gf-12L-38M-i4096", batch_size=32, device=device)
 
 # Initialize fine-tuning model
 geneformer_fine_tune = GeneformerFineTuningModel(
