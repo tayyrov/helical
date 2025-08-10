@@ -28,11 +28,11 @@ def classes_to_ids(example):
     example["cell_types"] = class_id_dict[example["cell_types"]]
     return example
 
-# Detect device (use GPU if available)
-device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Using device: {device}")
+# Detect device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}, GPUs available: {torch.cuda.device_count()}")
 
-# Create config with device
+# Create config
 geneformer_config = GeneformerConfig(model_name="gf-12L-38M-i4096", batch_size=32, device=device)
 
 # Initialize fine-tuning model
@@ -42,10 +42,18 @@ geneformer_fine_tune = GeneformerFineTuningModel(
     output_size=len(label_set)
 )
 
-# Process the whole dataset (no slicing)
+# --- Multi-GPU setup ---
+if torch.cuda.device_count() > 1:
+    print(f"Using {torch.cuda.device_count()} GPUs with DataParallel")
+    geneformer_fine_tune.model = torch.nn.DataParallel(geneformer_fine_tune.model)
+    geneformer_fine_tune.fine_tuning_head = torch.nn.DataParallel(geneformer_fine_tune.fine_tuning_head)
+    geneformer_fine_tune.config["batch_size"] *= torch.cuda.device_count()
+# -----------------------
+
+# Process the whole dataset
 dataset = geneformer_fine_tune.process_data(ann_data)
 
-# Add 'cell_types' column to dataset
+# Add 'cell_types' column
 dataset = dataset.add_column('cell_types', cell_types)
 
 # Convert classes to IDs
@@ -56,27 +64,26 @@ split = dataset.train_test_split(test_size=0.2, seed=42)
 train_dataset = split["train"]
 eval_dataset = split["test"]
 
-# Fine-tune the model with multiple epochs
+# ---- Baseline Accuracy Before Fine-tuning ----
+outputs_before = geneformer_fine_tune.get_outputs(eval_dataset)
+preds_before = outputs_before.argmax(axis=1).tolist()
+true_labels_eval = [ex["cell_types"] for ex in eval_dataset]
+acc_before = accuracy_score(true_labels_eval, preds_before)
+print(f"Baseline Accuracy (before fine-tuning): {acc_before:.4f}")
+
+# ---- Fine-tune the model ----
 geneformer_fine_tune.train(
     train_dataset=train_dataset,
-    label="cell_types"
+    label="cell_types",
+    epochs=3  # adjust as needed
 )
 
 # Save the fine-tuned model
 model_save_path = "./geneformer_finetuned"
 geneformer_fine_tune.save_model(model_save_path)
 
-# Reload model from saved path (optional)
-# geneformer_fine_tune.load_model(model_save_path)
-
-# Evaluate on the eval set
-outputs = geneformer_fine_tune.get_outputs(eval_dataset)
-preds = outputs.argmax(axis=1).tolist()
-
-# Get true labels from eval dataset
-true_labels = [ex["cell_types"] for ex in eval_dataset]
-
-# Calculate accuracy
-acc = accuracy_score(true_labels, preds)
-print(f"Evaluation Accuracy: {acc:.4f}")
-
+# ---- Accuracy After Fine-tuning ----
+outputs_after = geneformer_fine_tune.get_outputs(eval_dataset)
+preds_after = outputs_after.argmax(axis=1).tolist()
+acc_after = accuracy_score(true_labels_eval, preds_after)
+print(f"Evaluation Accuracy (after fine-tuning): {acc_after:.4f}")
