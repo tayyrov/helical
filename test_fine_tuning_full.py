@@ -8,7 +8,6 @@ import torch.distributed as dist
 import logging
 from datetime import datetime
 import sys
-from rich.logging import RichHandler
 
 # --------------------------
 # Configuration
@@ -29,12 +28,12 @@ EPOCHS = 1
 # Logging setup
 # --------------------------
 def setup_logging():
-    # Rich logging setup for colorful output
+    # Simple logging setup that works with distributed training
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
-            RichHandler(show_path=False, show_time=True)
+            logging.StreamHandler(sys.stdout)
         ]
     )
     
