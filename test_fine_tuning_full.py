@@ -8,6 +8,7 @@ import torch.distributed as dist
 import logging
 from datetime import datetime
 import sys
+from rich.logging import RichHandler
 
 # --------------------------
 # Configuration
@@ -21,24 +22,19 @@ FINE_TUNING_HEAD = "classification"  # Options: "classification", "regression", 
 # Model configuration
 MODEL_NAME = "gf-12L-38M-i4096"  # Change this to use different Geneformer models
 
+# Hyperparameters
+EPOCHS = 1
+
 # --------------------------
 # Logging setup
 # --------------------------
 def setup_logging():
-    # Create logs directory if it doesn't exist
-    os.makedirs("logs", exist_ok=True)
-    
-    # Create log filename with current date
-    current_date = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    log_filename = f"logs/geneformer_finetune_{current_date}.log"
-    
-    # Configure logging
+    # Rich logging setup for colorful output
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler(log_filename),
-            logging.StreamHandler(sys.stdout)
+            RichHandler(show_path=False, show_time=True)
         ]
     )
     
@@ -48,11 +44,13 @@ def setup_logging():
 # Distributed setup
 # --------------------------
 def setup_ddp():
-    dist.init_process_group(backend="nccl")
-    torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
+    if 'LOCAL_RANK' in os.environ and int(os.environ['LOCAL_RANK']) != -1:
+        dist.init_process_group(backend="nccl")
+        torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
 
 def cleanup_ddp():
-    dist.destroy_process_group()
+    if dist.is_initialized():
+        dist.destroy_process_group()
 
 def is_main_process():
     return not dist.is_initialized() or dist.get_rank() == 0
@@ -117,7 +115,9 @@ def main():
         return example
 
     # Step 3: Model + config
-    device = f"cuda:{int(os.environ['LOCAL_RANK'])}"
+    # Use LOCAL_RANK if available (DDP mode), otherwise default to 0 (single GPU mode)
+    # This line handles both single GPU and multi-GPU scenarios gracefully
+    device = f"cuda:{int(os.environ.get('LOCAL_RANK', 0))}"
     if is_main_process():
         logger.info(f"Using device: {device}")
         print(f"Using device: {device}")
@@ -156,6 +156,18 @@ def main():
     if is_main_process():
         logger.info(f"Train samples: {len(train_dataset)}, Test samples: {len(eval_dataset)}")
 
+    # Check if model already exists
+    model_save_path = f"./custom_finetuned/{model_name}_finetuned_{FINE_TUNING_HEAD}_epochs_{EPOCHS}"
+    model_exists = os.path.exists(model_save_path)
+    
+    if model_exists:
+        if is_main_process():
+            logger.info(f"Fine-tuned {FINE_TUNING_HEAD} model already exists at: {model_save_path}")
+            print(f"\n=== {FINE_TUNING_HEAD.title()} model already exists at: {model_save_path} ===")
+            logger.info("Script completed - model already exists")
+        cleanup_ddp()
+        return
+
     # Step 5: Evaluate before fine-tuning (only on main process)
     if is_main_process():
         logger.info(f"Evaluating model before {FINE_TUNING_HEAD} fine-tuning...")
@@ -171,41 +183,23 @@ def main():
     if is_main_process():
         logger.info(f"Starting {FINE_TUNING_HEAD} fine-tuning...")
     
-    # Check if model already exists
-    model_save_path = f"./custom_finetuned/{model_name}_finetuned_{FINE_TUNING_HEAD}_full"
-    model_exists = os.path.exists(model_save_path)
+    # Train the model
+    geneformer_fine_tune.train(
+        train_dataset=train_dataset,
+        label="cell_types",
+        epochs=EPOCHS
+    )
     
-    if model_exists and is_main_process():
-        logger.info(f"Fine-tuned {FINE_TUNING_HEAD} model already exists at: {model_save_path}")
-        print(f"\n=== {FINE_TUNING_HEAD.title()} model already exists at: {model_save_path} ===")
-        print("Loading existing model for evaluation...")
-        logger.info("Loading existing model for evaluation...")
-        
-        # Load the existing model
-        geneformer_fine_tune.load_model(model_save_path)
-        logger.info("Existing model loaded successfully")
-        
-    else:
-        # Train the model
-        geneformer_fine_tune.train(
-            train_dataset=train_dataset,
-            label="cell_types"
-        )
-        
-        if is_main_process():
-            logger.info(f"{FINE_TUNING_HEAD.title()} fine-tuning completed")
-            # Save model
-            geneformer_fine_tune.save_model(model_save_path)
-            logger.info(f"Model saved to: {model_save_path}")
+    if is_main_process():
+        logger.info(f"{FINE_TUNING_HEAD.title()} fine-tuning completed")
+        # Save model
+        geneformer_fine_tune.save_model(model_save_path)
+        logger.info(f"Model saved to: {model_save_path}")
 
     # Step 7: Evaluate after fine-tuning (only on main process)
     if is_main_process():
-        if model_exists:
-            logger.info(f"Evaluating existing fine-tuned {FINE_TUNING_HEAD} model...")
-            print(f"\n=== Evaluating EXISTING fine-tuned {FINE_TUNING_HEAD} model ===")
-        else:
-            logger.info(f"Evaluating model after {FINE_TUNING_HEAD} fine-tuning...")
-            print(f"\n=== Evaluating AFTER {FINE_TUNING_HEAD} fine-tuning ===")
+        logger.info(f"Evaluating model after {FINE_TUNING_HEAD} fine-tuning...")
+        print(f"\n=== Evaluating AFTER {FINE_TUNING_HEAD} fine-tuning ===")
             
         outputs_after = geneformer_fine_tune.get_outputs(eval_dataset)
         preds_after = outputs_after.argmax(axis=1).tolist()
