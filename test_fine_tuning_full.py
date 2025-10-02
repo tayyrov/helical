@@ -13,7 +13,7 @@ import sys
 # Configuration
 # --------------------------
 # Set your desired global batch size here - it will be automatically distributed across GPUs
-GLOBAL_BATCH_SIZE = 32
+GLOBAL_BATCH_SIZE = 16 # 32 fails if RAM is 40GB
 
 # Fine-tuning task type
 FINE_TUNING_HEAD = "classification"  # Options: "classification", "regression", "generation", etc.
