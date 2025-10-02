@@ -104,7 +104,7 @@ def map_ensembl_ids_to_gene_symbols(
     return adata
 
 
-def convert_list_ensembl_ids_to_gene_symbols(ensembl_ids: List[str], species=human) -> List[[str]]:
+def convert_list_ensembl_ids_to_gene_symbols(ensembl_ids: List[str], species=human) -> List[Optional[str]]:
     """
     Map a list of Ensembl IDs to gene symbols using pyensembl.
 
