@@ -36,9 +36,7 @@ except ImportError:
     print("This script requires the original Geneformer package for")
     print("InSilicoPerturber, EmbExtractor, and InSilicoPerturberStats.")
     print()
-    print("Install it with:")
-    print("  pip install geneformer")
-    print()
+   
     print("Alternatively, use CellReprogrammer's overexpression framework:")
     print("  See: src/perturbations/overexpression.py")
     print()
@@ -46,6 +44,10 @@ except ImportError:
 
 # Add helical to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+# Import helical's model config and constants
+from helical.models.geneformer import GeneformerConfig
+from helical.constants.paths import CACHE_DIR_HELICAL
 
 # =============================================================================
 # CONFIGURATION
@@ -56,10 +58,12 @@ BASE_DIR = Path("/home/ubuntu/data-at-virginia/helical")
 CELLREPROGRAMMER_DIR = BASE_DIR / "cellreprogrammer"
 DATA_DIR = CELLREPROGRAMMER_DIR / "data"
 
-# Paths - UPDATE THESE FOR YOUR SETUP
-# For V2 model, use HuggingFace model ID - Geneformer will download it
+# Model configuration - USE HELICAL TO DOWNLOAD MODEL
 MODEL_NAME = "gf-12L-38M-i4096"  # V2 model for reprogramming
-MODEL_PATH = MODEL_NAME  # Will be downloaded from HuggingFace
+GENEFORMER_CONFIG = GeneformerConfig(model_name=MODEL_NAME, batch_size=50)
+
+# Compute the cache path where helical stores the model
+MODEL_PATH = GENEFORMER_CONFIG.files_config["model_files_dir"]
 INPUT_DATA_PATH = DATA_DIR / "tokenized" / "fibroblast_ipsc.dataset"
 OUTPUT_DIR = CELLREPROGRAMMER_DIR / "results" / "oskm_experiment"
 
@@ -72,13 +76,19 @@ print("=" * 80)
 print()
 print("Paths:")
 print(f"  Working directory: {CELLREPROGRAMMER_DIR}")
-print(f"  Model: {MODEL_PATH}")
+print(f"  Model name: {MODEL_NAME}")
+print(f"  Model path: {MODEL_PATH}")
 print(f"  Data: {INPUT_DATA_PATH}")
 print(f"  Output: {OUTPUT_DIR}")
 print()
 
-# Verify inputs (MODEL_PATH is a HuggingFace ID, not a local path)
-print(f"Model will be loaded from HuggingFace: {MODEL_PATH}")
+# Verify model is downloaded via helical
+print(f"Ensuring model is downloaded via helical...")
+from helical.utils.downloader import Downloader
+downloader = Downloader()
+for file in GENEFORMER_CONFIG.list_of_files_to_download:
+    downloader.download_via_name(file)
+print(f"✓ Model available at: {MODEL_PATH}")
 print()
 
 if not INPUT_DATA_PATH.exists():
