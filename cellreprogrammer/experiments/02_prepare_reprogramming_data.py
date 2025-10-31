@@ -20,8 +20,10 @@ import pandas as pd
 import numpy as np
 import logging
 
-# Import helical's tokenizer
+# Import helical components
+from helical.models.geneformer import GeneformerConfig
 from helical.models.geneformer.geneformer_tokenizer import TranscriptomeTokenizer
+from helical.utils.downloader import Downloader
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
@@ -183,23 +185,51 @@ print("=" * 80)
 print("Initializing Geneformer tokenizer...")
 print(f"  Preserving metadata: {list(custom_attrs.values())}")
 
-# Note: Model version V2 for compatibility with newest models
+# First, download model files if needed by creating a Geneformer config
+print("  Ensuring model files are downloaded...")
+model_name = "gf-12L-38M-i4096"  # V2 model for reprogramming
+config = GeneformerConfig(model_name=model_name)
+
+# Use the config to get the correct paths
+model_version = config.model_map[model_name]['model_version']
+input_size = config.model_map[model_name]['input_size']
+special_token = config.model_map[model_name]['special_token']
+
+print(f"  Model version: {model_version}, input_size: {input_size}, special_token: {special_token}")
+
+# Download tokenizer files using downloader (without loading full model)
+print("  Downloading tokenizer files if needed...")
+downloader = Downloader()
+# Only download tokenizer files, not the full model
+tokenizer_files = [
+    file for file in config.list_of_files_to_download 
+    if 'gene_median' in file or 'token_dictionary' in file or 'ensembl_mapping' in file
+]
+for file in tokenizer_files:
+    downloader.download_via_name(file)
+print("  ✓ Tokenizer files ready")
+
+# Use tokenizer with V2 files (from cache directory)
 tk = TranscriptomeTokenizer(
     custom_attr_name_dict=custom_attrs if custom_attrs else None,
     nproc=16,  # Adjust based on available CPUs
+    model_input_size=input_size,
+    special_token=special_token,
+    gene_median_file=config.files_config['gene_median_path'],
+    token_dictionary_file=config.files_config['token_path'],
+    gene_mapping_file=config.files_config['ensembl_dict_path'],
 )
 
 print("Tokenizing... (this may take several minutes)")
 print(f"  Input: {PREPARED_DIR}")
 print(f"  Output: {TOKENIZED_DIR}")
 
-# Tokenize the specific file
+# Tokenize all h5ad files in the directory
 tk.tokenize_data(
     str(PREPARED_DIR),  # Directory containing h5ad files
     str(TOKENIZED_DIR),  # Output directory
     OUTPUT_PREFIX,  # Output prefix
-    file_format="h5ad",
-    input_identifier=output_h5ad.stem  # Only tokenize this specific file
+    file_format="h5ad"
 )
 
 tokenized_path = TOKENIZED_DIR / f"{OUTPUT_PREFIX}.dataset"
