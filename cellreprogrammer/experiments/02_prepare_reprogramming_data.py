@@ -221,18 +221,24 @@ tk = TranscriptomeTokenizer(
 )
 
 print("Tokenizing... (this may take several minutes)")
-print(f"  Input: {PREPARED_DIR}")
+print(f"  Input: {output_h5ad}")
 print(f"  Output: {TOKENIZED_DIR}")
 
-# Tokenize all h5ad files in the directory
-tk.tokenize_data(
-    str(PREPARED_DIR),  # Directory containing h5ad files
-    str(TOKENIZED_DIR),  # Output directory
-    OUTPUT_PREFIX,  # Output prefix
-    file_format="h5ad"
-)
+# Tokenize the specific prepared file
+print("Reading prepared data...")
+tokenize_adata = sc.read_h5ad(output_h5ad)
+print(f"✓ Loaded: {tokenize_adata.n_obs} cells × {tokenize_adata.n_vars} genes")
+
+# Use tokenize_anndata for single file instead of tokenize_data for directory
+print("Tokenizing cells...")
+tokenized_cells, cell_metadata = tk.tokenize_anndata(tokenize_adata)
+
+print("Creating dataset...")
+from datasets import Dataset
+tokenized_dataset = tk.create_dataset(tokenized_cells, cell_metadata, use_generator=False)
 
 tokenized_path = TOKENIZED_DIR / f"{OUTPUT_PREFIX}.dataset"
+tokenized_dataset.save_to_disk(str(tokenized_path))
 print(f"✓ Tokenized data saved to: {tokenized_path}")
 print()
 
