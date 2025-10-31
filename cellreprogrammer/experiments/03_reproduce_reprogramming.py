@@ -57,7 +57,9 @@ CELLREPROGRAMMER_DIR = BASE_DIR / "cellreprogrammer"
 DATA_DIR = CELLREPROGRAMMER_DIR / "data"
 
 # Paths - UPDATE THESE FOR YOUR SETUP
-MODEL_PATH = BASE_DIR / "models" / "Geneformer-V2-104M"  # Adjust path to your model
+# For V2 model, use HuggingFace model ID - Geneformer will download it
+MODEL_NAME = "gf-12L-38M-i4096"  # V2 model for reprogramming
+MODEL_PATH = MODEL_NAME  # Will be downloaded from HuggingFace
 INPUT_DATA_PATH = DATA_DIR / "tokenized" / "fibroblast_ipsc.dataset"
 OUTPUT_DIR = CELLREPROGRAMMER_DIR / "results" / "oskm_experiment"
 
@@ -75,11 +77,9 @@ print(f"  Data: {INPUT_DATA_PATH}")
 print(f"  Output: {OUTPUT_DIR}")
 print()
 
-# Verify inputs
-if not MODEL_PATH.exists():
-    print(f"WARNING: Model path not found: {MODEL_PATH}")
-    print("Please adjust MODEL_PATH or download the model")
-    print()
+# Verify inputs (MODEL_PATH is a HuggingFace ID, not a local path)
+print(f"Model will be loaded from HuggingFace: {MODEL_PATH}")
+print()
 
 if not INPUT_DATA_PATH.exists():
     print(f"ERROR: Data not found: {INPUT_DATA_PATH}")
