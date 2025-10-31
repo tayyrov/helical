@@ -224,14 +224,13 @@ print("Tokenizing... (this may take several minutes)")
 print(f"  Input: {output_h5ad}")
 print(f"  Output: {TOKENIZED_DIR}")
 
-# Tokenize the specific prepared file
-print("Reading prepared data...")
-tokenize_adata = sc.read_h5ad(output_h5ad)
-print(f"✓ Loaded: {tokenize_adata.n_obs} cells × {tokenize_adata.n_vars} genes")
+# Use the already-loaded and filtered adata in memory (no need to reload)
+print("✓ Using prepared and QC-filtered data in memory")
+print(f"  Cells: {adata.n_obs} (filter_pass = {adata.obs['filter_pass'].sum()} will be tokenized)")
 
 # Use tokenize_anndata for single file instead of tokenize_data for directory
 print("Tokenizing cells...")
-tokenized_cells, cell_metadata = tk.tokenize_anndata(tokenize_adata)
+tokenized_cells, cell_metadata = tk.tokenize_anndata(adata)
 
 print("Creating dataset...")
 from datasets import Dataset
