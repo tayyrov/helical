@@ -14,6 +14,7 @@ GSE118258 dataset (Xing et al. 2020).
 1. **`01_convert_geo_data.py`** - Convert raw GSE118258 data to h5ad format
 2. **`02_prepare_reprogramming_data.py`** - Prepare and tokenize data for Geneformer
 3. **`03_reproduce_reprogramming.py`** - Run OSKM reprogramming experiment
+4. **`04_compare_all_models.py`** - Compare all Geneformer models
 
 ## Quick Start
 
@@ -192,6 +193,36 @@ After running experiments:
 4. Try different gene combinations
 
 ## Additional Examples
+
+### Model Comparison Script
+
+**`04_compare_all_models.py`** - Compare all Geneformer models to find the best one
+
+**Purpose:** Test all available Geneformer models on the OSKM reprogramming task
+
+**Usage:**
+```bash
+python 04_compare_all_models.py
+```
+
+**What it does:**
+1. Runs the OSKM experiment for each model (V1, V2, V3)
+2. Compares mean shift to iPSC state
+3. Saves comparison CSV
+4. Prints best performing model
+
+**Models tested:**
+- V1: gf-6L-10M-i2048, gf-12L-40M-i2048, gf-12L-40M-i2048-CZI-CellxGene
+- V2: gf-12L-38M-i4096, gf-20L-151M-i4096, gf-12L-38M-i4096-CLcancer
+- V3: gf-12L-104M-i4096, gf-12L-104M-i4096-CLcancer, gf-18L-316M-i4096
+
+**Output:**
+- `results/model_comparison/model_comparison_results.csv` - Full results
+- `results/model_comparison/<model_name>/` - Individual model results
+
+**Time:** ~1-2 hours depending on GPU (9 models × 10-15 min each)
+
+---
 
 See `example_overexpression.py` for a simpler example using just helical's API.
 
