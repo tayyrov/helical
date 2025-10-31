@@ -136,6 +136,9 @@ def sum_ensembl_ids(
             data.var["ensembl_id_collapsed"] = data.var.ensembl_id.str.upper().map(
                 gene_mapping_dict
             )
+            # Keep ensembl_id for compatibility if it doesn't exist
+            if "ensembl_id" not in data.var.columns:
+                data.var["ensembl_id"] = data.var["ensembl_id_collapsed"]
             return data
         # Genes need to be collapsed
         else:
@@ -174,9 +177,14 @@ def sum_ensembl_ids(
             processed_genes = pd.concat(processed_genes, axis=0)
             var_df = pd.DataFrame({"ensembl_id_collapsed": processed_genes.columns})
             var_df.index = processed_genes.columns
+            # Add ensembl_id column for compatibility with tokenizer
+            var_df["ensembl_id"] = processed_genes.columns
             processed_genes = sc.AnnData(X=processed_genes, obs=data.obs, var=var_df)
 
             data_dedup = data[:, ~data.var.index.isin(dup_genes)]  # Deduplicated data
+            # Ensure ensembl_id is preserved in data_dedup after var_names change
+            if "ensembl_id" not in data_dedup.var.columns and "ensembl_id_collapsed" in data_dedup.var.columns:
+                data_dedup.var["ensembl_id"] = data_dedup.var["ensembl_id_collapsed"]
             data_dedup = sc.concat([data_dedup, processed_genes], axis=1)
             data_dedup.obs = data.obs
             return data_dedup
