@@ -139,12 +139,12 @@ print()
 # =============================================================================
 
 MAX_NCELLS = 500  # Reduced for memory
-NPROC = 0  # Set to 0 to disable multiprocessing (avoids CUDA issues)
+NPROC = 1  # Use 1 process for data filtering (Geneformer requires > 0)
 FORWARD_BATCH_SIZE = 50  # Reduced for A100 memory constraints
 MODEL_VERSION = "V2"  # Using V2 model
 
 # Disable multiprocessing for CUDA compatibility
-os.environ['DATASETS_NUM_PROC'] = '0'
+os.environ['DATASETS_NUM_PROC'] = '1'  # Geneformer requires at least 1
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
 print("Computational settings:")
