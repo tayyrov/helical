@@ -1,6 +1,10 @@
 *.egg-info
 __pycache__
 .vscode
+.idea
+venv/
+env/
+.venv/
 dist/*
 examples/notebooks/logs/*
 

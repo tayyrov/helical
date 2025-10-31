@@ -15,10 +15,12 @@ __pycache__/
 venv/
 env/
 .venv/
+../.venv/
 
 # IDE
 .vscode/
 .idea/
+../.idea/
 *.swp
 *.swo
 
