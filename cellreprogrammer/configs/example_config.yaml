@@ -1,0 +1,47 @@
+# Example configuration file for CellReprogrammer experiments
+
+# Model configuration
+model:
+  name: "geneformer"  # Options: geneformer, scgpt, uce, helix_mrna, etc.
+  config:
+    model_name: "gf-12L-38M-i4096"  # Model variant
+    batch_size: 10
+    device: "cuda"  # or "cpu"
+
+# Perturbation configuration
+perturbation:
+  type: "overexpression"  # Options: overexpression, knockdown, etc.
+  genes: ["BRCA1", "TP53", "MYC"]  # Genes to perturb (symbols or Ensembl IDs)
+  strength: 2.5  # Perturbation strength (for overexpression, this is the multiplier)
+  use_ensembl: false  # Whether genes are provided as Ensembl IDs
+
+# Data configuration
+data:
+  # Option 1: Load from local file
+  path: "path/to/your/data.h5ad"
+  
+  # Option 2: Load from HuggingFace dataset
+  # huggingface_dataset: "helical-ai/yolksac_human"
+  # split: "train[:10]"
+  
+  # Data preprocessing
+  subsample_cells: null  # Set to integer to subsample, null to use all
+  gene_column: "index"  # Column name for gene names in adata.var
+
+# Experiment configuration
+experiment:
+  name: "overexpression_experiment_1"
+  output_dir: "results/"
+  save_embeddings: true
+  save_results: true
+  
+  # Comparison settings
+  compute_control: true  # Whether to compare with control condition
+  comparison_metric: "euclidean"  # Options: euclidean, cosine, etc.
+
+# Logging configuration
+logging:
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+  log_file: null  # Path to log file, or null for console only
+
+
