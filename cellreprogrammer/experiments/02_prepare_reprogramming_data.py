@@ -37,7 +37,8 @@ print()
 
 # Base paths
 BASE_DIR = Path("/home/ubuntu/data-at-virginia/helical")
-DATA_DIR = BASE_DIR / "data"
+CELLREPROGRAMMER_DIR = BASE_DIR / "cellreprogrammer"
+DATA_DIR = CELLREPROGRAMMER_DIR / "data"
 PREPARED_DIR = DATA_DIR / "prepared"
 TOKENIZED_DIR = DATA_DIR / "tokenized"
 
@@ -49,7 +50,7 @@ OUTPUT_PREFIX = "fibroblast_ipsc"
 os.makedirs(PREPARED_DIR, exist_ok=True)
 os.makedirs(TOKENIZED_DIR, exist_ok=True)
 
-print(f"Working directory: {BASE_DIR}")
+print(f"Working directory: {CELLREPROGRAMMER_DIR}")
 print(f"Input: {INPUT_FILE}")
 print(f"Output: {TOKENIZED_DIR}/{OUTPUT_PREFIX}.dataset")
 print()

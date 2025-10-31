@@ -53,12 +53,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Base paths
 BASE_DIR = Path("/home/ubuntu/data-at-virginia/helical")
-DATA_DIR = BASE_DIR / "data"
+CELLREPROGRAMMER_DIR = BASE_DIR / "cellreprogrammer"
+DATA_DIR = CELLREPROGRAMMER_DIR / "data"
 
 # Paths - UPDATE THESE FOR YOUR SETUP
 MODEL_PATH = BASE_DIR / "models" / "Geneformer-V2-104M"  # Adjust path to your model
 INPUT_DATA_PATH = DATA_DIR / "tokenized" / "fibroblast_ipsc.dataset"
-OUTPUT_DIR = BASE_DIR / "results" / "oskm_experiment"
+OUTPUT_DIR = CELLREPROGRAMMER_DIR / "results" / "oskm_experiment"
 
 # Create output directory
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -68,6 +69,7 @@ print("Geneformer Reprogramming Experiment")
 print("=" * 80)
 print()
 print("Paths:")
+print(f"  Working directory: {CELLREPROGRAMMER_DIR}")
 print(f"  Model: {MODEL_PATH}")
 print(f"  Data: {INPUT_DATA_PATH}")
 print(f"  Output: {OUTPUT_DIR}")

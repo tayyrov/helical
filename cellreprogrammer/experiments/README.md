@@ -38,6 +38,7 @@ GSE118258 dataset (Xing et al. 2020).
 
 3. **Update paths in scripts:**
    - All scripts use BASE_DIR = `/home/ubuntu/data-at-virginia/helical`
+   - Data goes under `cellreprogrammer/data/` (keeps helical clean)
    - Adjust if your setup differs
 
 ### Run Pipeline
@@ -125,13 +126,15 @@ cellreprogrammer/experiments/
 Expected data structure:
 ```
 /home/ubuntu/data-at-virginia/helical/
-├── data/
-│   ├── raw/                           # Raw GEO files
-│   ├── prepared/                      # Converted h5ad files
-│   └── tokenized/                     # Tokenized datasets
-├── results/
-│   └── oskm_experiment/               # Experiment results
-└── models/                            # Geneformer models
+├── cellreprogrammer/                   # CellReprogrammer workspace
+│   ├── data/                           # Experiment data (isolated!)
+│   │   ├── raw/                        # Raw GEO files
+│   │   ├── prepared/                   # Converted h5ad files
+│   │   └── tokenized/                  # Tokenized datasets
+│   └── results/                        # Experiment results
+│       └── oskm_experiment/            # OSKM experiment output
+├── models/                             # Geneformer models
+└── helical/                            # Helical package (untouched!)
 ```
 
 ## Configuration
@@ -168,7 +171,7 @@ If you get out of memory errors:
 ### Path not found errors
 
 Ensure:
-1. Raw data files exist in `data/raw/`
+1. Raw data files exist in `cellreprogrammer/data/raw/`
 2. Previous scripts completed successfully
 3. Base directory path is correct
 

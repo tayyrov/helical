@@ -31,8 +31,9 @@ print()
 
 # Base paths
 BASE_DIR = Path("/home/ubuntu/data-at-virginia/helical")
-RAW_DIR = BASE_DIR / "data" / "raw"
-OUTPUT_DIR = BASE_DIR / "data" / "prepared"
+CELLREPROGRAMMER_DIR = BASE_DIR / "cellreprogrammer"
+RAW_DIR = CELLREPROGRAMMER_DIR / "data" / "raw"
+OUTPUT_DIR = CELLREPROGRAMMER_DIR / "data" / "prepared"
 
 # Ensure directories exist
 os.makedirs(RAW_DIR, exist_ok=True)
@@ -45,7 +46,7 @@ annotation_file = RAW_DIR / "GSE118258_Annotation.txt.gz"
 # Output file
 output_file = OUTPUT_DIR / "GSE118258_converted.h5ad"
 
-print(f"Working directory: {BASE_DIR}")
+print(f"Working directory: {CELLREPROGRAMMER_DIR}")
 print(f"Input: {RAW_DIR}")
 print(f"Output: {OUTPUT_DIR}")
 print()

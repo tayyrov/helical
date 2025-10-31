@@ -21,6 +21,7 @@ Your three working scripts from the Geneformer repo have been successfully adapt
 All scripts now use a unified base directory:
 ```python
 BASE_DIR = Path("/home/ubuntu/data-at-virginia/helical")
+CELLREPROGRAMMER_DIR = BASE_DIR / "cellreprogrammer"  # Data isolated here!
 ```
 
 ### 2. Helical Integration
@@ -112,6 +113,7 @@ python 03_reproduce_reprogramming.py
 
 ### ✅ Works on Remote Server
 - All paths updated for `/home/ubuntu/data-at-virginia/helical`
+- Data isolated under `cellreprogrammer/data/` (keeps helical clean!)
 - No more hardcoded local paths
 - Easy to adapt for different environments
 

@@ -106,8 +106,15 @@ cellreprogrammer/
 │   ├── example_overexpression.py  # Example scripts
 │   └── configs/                   # Configuration files
 ├── notebooks/                     # Jupyter notebooks
+├── data/                          # Experiment data (created at runtime)
+│   ├── raw/                       # Raw data files
+│   ├── prepared/                  # Processed data
+│   └── tokenized/                 # Tokenized datasets
+├── results/                       # Experiment outputs
 └── README.md
 ```
+
+**Important:** All data and results are stored under the `cellreprogrammer/` directory to keep the helical package clean and uncontaminated.
 
 ## Available Models
 
