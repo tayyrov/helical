@@ -121,7 +121,7 @@ FILTER_DATA = {{"cell_type": ["Fibroblast", "iPSC", "Failed_reprogramming"]}}
 MAX_NCELLS = 500
 NPROC = 1
 FORWARD_BATCH_SIZE = 50
-MODEL_VERSION = GENEFORMER_CONFIG.config["model_version"].upper()
+MODEL_VERSION = GENEFORMER_CONFIG.model_map[MODEL_NAME]["model_version"].upper()
 
 # Step 1: Extract state embeddings
 print("Extracting state embeddings...")
