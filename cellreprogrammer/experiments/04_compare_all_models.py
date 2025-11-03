@@ -197,6 +197,51 @@ ispstats_oskm.get_stats(
     "oskm_stats"
 )
 
+# Step 4: Random control perturbation
+RANDOM_CONTROL_GENES = ["ENSG00000111640", "ENSG00000075624", "ENSG00000204525", "ENSG00000198899"]
+os.makedirs(OUTPUT_DIR / "random", exist_ok=True)
+isp_random = InSilicoPerturber(
+    perturb_type="overexpress",
+    perturb_rank_shift=None,
+    genes_to_perturb=RANDOM_CONTROL_GENES,
+    combos=0,
+    anchor_gene=None,
+    model_type="Pretrained",
+    num_classes=0,
+    emb_mode="cls",
+    cell_emb_style="mean_pool",
+    filter_data={{"cell_type": [CELL_STATES["start_state"]]}},
+    cell_states_to_model=CELL_STATES,
+    state_embs_dict=state_embs_dict,
+    max_ncells=MAX_NCELLS,
+    emb_layer=-1,
+    forward_batch_size=FORWARD_BATCH_SIZE,
+    model_version=MODEL_VERSION,
+    nproc=NPROC
+)
+isp_random.perturb_data(
+    str(MODEL_PATH),
+    str(INPUT_DATA_PATH),
+    str(OUTPUT_DIR / "random"),
+    "random"
+)
+
+# Step 5: Analyze random controls
+ispstats_random = InSilicoPerturberStats(
+    mode="goal_state_shift",
+    genes_perturbed=RANDOM_CONTROL_GENES,
+    combos=0,
+    anchor_gene=None,
+    cell_states_to_model=CELL_STATES,
+    model_version=MODEL_VERSION
+)
+ispstats_random.get_stats(
+    str(OUTPUT_DIR / "random"),
+    None,
+    str(OUTPUT_DIR),
+    "random_stats"
+)
+
 print(f"✓ Completed: {{MODEL_NAME}}")
 '''
         
@@ -215,7 +260,32 @@ print(f"✓ Completed: {{MODEL_NAME}}")
         
         if result.returncode == 0:
             print(f"✓ SUCCESS: {model_name}")
-            print(result.stdout[-500:])  # Show last 500 chars
+            # Try to extract and print results
+            try:
+                model_dir = COMPARISON_DIR / model_name
+                oskm_stats_file = model_dir / "oskm_stats.csv"
+                random_stats_file = model_dir / "random_stats.csv"
+                
+                if oskm_stats_file.exists():
+                    oskm_df = pd.read_csv(oskm_stats_file)
+                    oskm_shift = oskm_df['Shift_to_goal_end'].mean() if 'Shift_to_goal_end' in oskm_df.columns else None
+                    
+                    random_shift = None
+                    if random_stats_file.exists():
+                        random_df = pd.read_csv(random_stats_file)
+                        random_shift = random_df['Shift_to_goal_end'].mean() if 'Shift_to_goal_end' in random_df.columns else None
+                    
+                    improvement = None
+                    if oskm_shift is not None and random_shift is not None:
+                        improvement = oskm_shift - random_shift
+                    
+                    print(f"  Results:")
+                    print(f"    OSKM shift: {oskm_shift:.6f}" if oskm_shift is not None else "    OSKM shift: N/A")
+                    print(f"    Random shift: {random_shift:.6f}" if random_shift is not None else "    Random shift: N/A")
+                    print(f"    Improvement: {improvement:.6f}" if improvement is not None else "    Improvement: N/A")
+            except Exception:
+                pass  # Don't fail if we can't parse results
+            print()
             return True
         else:
             print(f"✗ FAILED: {model_name}")
@@ -257,48 +327,61 @@ comparison_data = []
 
 for model_name, success in results.items():
     model_dir = COMPARISON_DIR / model_name
-    stats_file = model_dir / "oskm_stats.csv"
+    oskm_stats_file = model_dir / "oskm_stats.csv"
+    random_stats_file = model_dir / "random_stats.csv"
     
-    if success and stats_file.exists():
+    if success and oskm_stats_file.exists():
         try:
-            df = pd.read_csv(stats_file)
-            if 'Shift_to_goal_end' in df.columns:
-                shift = df['Shift_to_goal_end'].mean()
-                comparison_data.append({
-                    'Model': model_name,
-                    'Mean_Shift_to_iPSC': shift,
-                    'Status': 'Success'
-                })
-            else:
-                comparison_data.append({
-                    'Model': model_name,
-                    'Mean_Shift_to_iPSC': None,
-                    'Status': 'No shift data'
-                })
+            # Read OSKM stats
+            oskm_df = pd.read_csv(oskm_stats_file)
+            oskm_shift = oskm_df['Shift_to_goal_end'].mean() if 'Shift_to_goal_end' in oskm_df.columns else None
+            
+            # Read random stats if available
+            random_shift = None
+            if random_stats_file.exists():
+                random_df = pd.read_csv(random_stats_file)
+                random_shift = random_df['Shift_to_goal_end'].mean() if 'Shift_to_goal_end' in random_df.columns else None
+            
+            # Calculate improvement (difference)
+            improvement = None
+            if oskm_shift is not None and random_shift is not None:
+                improvement = oskm_shift - random_shift
+            
+            comparison_data.append({
+                'Model': model_name,
+                'OSKM_Shift': oskm_shift,
+                'Random_Shift': random_shift,
+                'Improvement': improvement,
+                'Status': 'Success'
+            })
         except Exception as e:
             comparison_data.append({
                 'Model': model_name,
-                'Mean_Shift_to_iPSC': None,
+                'OSKM_Shift': None,
+                'Random_Shift': None,
+                'Improvement': None,
                 'Status': f'Error: {e}'
             })
     else:
         comparison_data.append({
             'Model': model_name,
-            'Mean_Shift_to_iPSC': None,
+            'OSKM_Shift': None,
+            'Random_Shift': None,
+            'Improvement': None,
             'Status': 'Failed' if not success else 'Missing results'
         })
 
 # Create comparison dataframe
 comparison_df = pd.DataFrame(comparison_data)
 
-# Sort by shift value (descending)
-if 'Mean_Shift_to_iPSC' in comparison_df.columns:
-    comparison_df['Mean_Shift_to_iPSC'] = pd.to_numeric(
-        comparison_df['Mean_Shift_to_iPSC'], 
+# Sort by improvement value (descending)
+if 'Improvement' in comparison_df.columns:
+    comparison_df['Improvement'] = pd.to_numeric(
+        comparison_df['Improvement'], 
         errors='coerce'
     )
     comparison_df = comparison_df.sort_values(
-        'Mean_Shift_to_iPSC', 
+        'Improvement', 
         ascending=False, 
         na_position='last'
     )
@@ -323,21 +406,22 @@ if not successful_results.empty:
     print("BEST MODEL:")
     print("=" * 80)
     print(f"Model: {best_model['Model']}")
-    shift_value = best_model['Mean_Shift_to_iPSC']
-    print(f"Mean Shift to iPSC: {shift_value:.6f}")
-    if shift_value > 0:
-        print("  Interpretation: Shifts cells TOWARD iPSC state (desired)")
-    elif shift_value < 0:
-        print("  Interpretation: Shifts cells AWAY from iPSC state (not desired)")
+    print(f"OSKM Shift: {best_model['OSKM_Shift']:.6f}")
+    print(f"Random Shift: {best_model['Random_Shift']:.6f}")
+    improvement_value = best_model['Improvement']
+    print(f"Improvement: {improvement_value:.6f}")
+    if improvement_value > 0:
+        print("  Interpretation: OSKM factors outperform random controls")
     else:
-        print("  Interpretation: No significant shift detected")
+        print("  Interpretation: OSKM factors do not outperform random controls")
     print()
     
     # Show top 3
     if len(successful_results) > 1:
         print("Top 3 models:")
         for i, row in successful_results.head(3).iterrows():
-            print(f"  {list(successful_results.index).index(i) + 1}. {row['Model']}: {row['Mean_Shift_to_iPSC']:.6f}")
+            print(f"  {list(successful_results.index).index(i) + 1}. {row['Model']}")
+            print(f"     OSKM: {row['OSKM_Shift']:.6f}, Random: {row['Random_Shift']:.6f}, Improvement: {row['Improvement']:.6f}")
         print()
 else:
     print("⚠️  No models completed successfully")
