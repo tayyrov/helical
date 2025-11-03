@@ -181,65 +181,73 @@ print("=" * 80)
 print("Step 6: Tokenizing data for Geneformer")
 print("=" * 80)
 
-# Initialize tokenizer with helical
-print("Initializing Geneformer tokenizer...")
-print(f"  Preserving metadata: {list(custom_attrs.values())}")
+# Tokenize for BOTH V1 and V2 models
+from datasets import Dataset
 
-# First, download model files if needed by creating a Geneformer config
-print("  Ensuring model files are downloaded...")
-model_name = "gf-12L-38M-i4096"  # V2 model for reprogramming
-config = GeneformerConfig(model_name=model_name)
-
-# Use the config to get the correct paths
-model_version = config.model_map[model_name]['model_version']
-input_size = config.model_map[model_name]['input_size']
-special_token = config.model_map[model_name]['special_token']
-
-print(f"  Model version: {model_version}, input_size: {input_size}, special_token: {special_token}")
-
-# Download tokenizer files using downloader (without loading full model)
-print("  Downloading tokenizer files if needed...")
-downloader = Downloader()
-# Only download tokenizer files, not the full model
-tokenizer_files = [
-    file for file in config.list_of_files_to_download 
-    if 'gene_median' in file or 'token_dictionary' in file or 'ensembl_mapping' in file
+models_to_tokenize = [
+    ("gf-12L-40M-i2048", "v1"),  # V1 model for i2048 models
+    ("gf-12L-38M-i4096", "v2"),  # V2 model for i4096 models
 ]
-for file in tokenizer_files:
-    downloader.download_via_name(file)
-print("  ✓ Tokenizer files ready")
 
-# Use tokenizer with V2 files (from cache directory)
-tk = TranscriptomeTokenizer(
-    custom_attr_name_dict=custom_attrs if custom_attrs else None,
-    nproc=16,  # Adjust based on available CPUs
-    model_input_size=input_size,
-    special_token=special_token,
-    gene_median_file=config.files_config['gene_median_path'],
-    token_dictionary_file=config.files_config['token_path'],
-    gene_mapping_file=config.files_config['ensembl_dict_path'],
-)
-
-print("Tokenizing... (this may take several minutes)")
-print(f"  Input: {output_h5ad}")
-print(f"  Output: {TOKENIZED_DIR}")
-
-# Use the already-loaded and filtered adata in memory (no need to reload)
 print("✓ Using prepared and QC-filtered data in memory")
 print(f"  Cells: {adata.n_obs} (filter_pass = {adata.obs['filter_pass'].sum()} will be tokenized)")
-
-# Use tokenize_anndata for single file instead of tokenize_data for directory
-print("Tokenizing cells...")
-tokenized_cells, cell_metadata = tk.tokenize_anndata(adata)
-
-print("Creating dataset...")
-from datasets import Dataset
-tokenized_dataset = tk.create_dataset(tokenized_cells, cell_metadata, use_generator=False)
-
-tokenized_path = TOKENIZED_DIR / f"{OUTPUT_PREFIX}.dataset"
-tokenized_dataset.save_to_disk(str(tokenized_path))
-print(f"✓ Tokenized data saved to: {tokenized_path}")
 print()
+
+for model_name, version_suffix in models_to_tokenize:
+    print(f"--- Tokenizing for {model_name} ({version_suffix.upper()}) ---")
+    
+    # Initialize tokenizer with helical
+    print("  Initializing Geneformer tokenizer...")
+    print(f"  Preserving metadata: {list(custom_attrs.values())}")
+    
+    # Create Geneformer config
+    config = GeneformerConfig(model_name=model_name)
+    
+    # Get the correct paths
+    model_version = config.model_map[model_name]['model_version']
+    input_size = config.model_map[model_name]['input_size']
+    special_token = config.model_map[model_name]['special_token']
+    
+    print(f"  Model version: {model_version}, input_size: {input_size}, special_token: {special_token}")
+    
+    # Download tokenizer files if needed
+    print("  Downloading tokenizer files if needed...")
+    downloader = Downloader()
+    tokenizer_files = [
+        file for file in config.list_of_files_to_download 
+        if 'gene_median' in file or 'token_dictionary' in file or 'ensembl_mapping' in file
+    ]
+    for file in tokenizer_files:
+        downloader.download_via_name(file)
+    print("  ✓ Tokenizer files ready")
+    
+    # Use tokenizer
+    tk = TranscriptomeTokenizer(
+        custom_attr_name_dict=custom_attrs if custom_attrs else None,
+        nproc=16,
+        model_input_size=input_size,
+        special_token=special_token,
+        gene_median_file=config.files_config['gene_median_path'],
+        token_dictionary_file=config.files_config['token_path'],
+        gene_mapping_file=config.files_config['ensembl_dict_path'],
+    )
+    
+    # Tokenize the data
+    print("  Tokenizing cells...")
+    tokenized_cells, cell_metadata = tk.tokenize_anndata(adata)
+    
+    print("  Creating dataset...")
+    tokenized_dataset = tk.create_dataset(tokenized_cells, cell_metadata, use_generator=False)
+    
+    # Save with appropriate version suffix
+    if version_suffix == "v1":
+        tokenized_path = TOKENIZED_DIR / f"{OUTPUT_PREFIX}_v1.dataset"
+    else:
+        tokenized_path = TOKENIZED_DIR / f"{OUTPUT_PREFIX}.dataset"
+    
+    tokenized_dataset.save_to_disk(str(tokenized_path))
+    print(f"  ✓ Tokenized data saved to: {tokenized_path}")
+    print()
 
 # =============================================================================
 # SUMMARY
@@ -254,12 +262,14 @@ print(f"  • Prepared cells: {adata.n_obs}")
 print(f"  • Genes: {adata.n_vars}")
 print(f"  • Cells passing QC: {n_pass}")
 print(f"  • Prepared file: {output_h5ad}")
-print(f"  • Tokenized file: {tokenized_path}")
+print(f"  • Tokenized files:")
+print(f"    - V1 (2048 tokens): {TOKENIZED_DIR}/{OUTPUT_PREFIX}_v1.dataset")
+print(f"    - V2 (4096 tokens): {TOKENIZED_DIR}/{OUTPUT_PREFIX}.dataset")
 print()
 print("Next steps:")
-print("  1. Verify the tokenized dataset exists")
-print(f"  2. Update INPUT_DATA_PATH in 03_reproduce_reprogramming.py")
-print(f"  3. Run: python 03_reproduce_reprogramming.py")
+print("  1. Verify the tokenized datasets exist")
+print(f"  2. Run: python 03_reproduce_reprogramming.py (uses V2/V3)")
+print(f"  3. Run: python 04_compare_all_models.py (all 9 models)")
 print()
 print("=" * 80)
 

@@ -59,7 +59,7 @@ CELLREPROGRAMMER_DIR = BASE_DIR / "cellreprogrammer"
 DATA_DIR = CELLREPROGRAMMER_DIR / "data"
 
 # Model configuration - USE HELICAL TO DOWNLOAD MODEL
-MODEL_NAME = "gf-12L-38M-i4096"  # V2 model for reprogramming
+MODEL_NAME = "gf-20L-151M-i4096"  # V2 model for reprogramming
 GENEFORMER_CONFIG = GeneformerConfig(model_name=MODEL_NAME, batch_size=50)
 
 # Compute the cache path where helical stores the model
@@ -357,6 +357,7 @@ print()
 
 try:
     import pandas as pd
+    import numpy as np
     
     print("=" * 80)
     print("Quick comparison")
@@ -367,16 +368,31 @@ try:
     
     if 'Shift_to_goal_end' in oskm_df.columns:
         oskm_mean = oskm_df['Shift_to_goal_end'].mean()
-        print(f"OSKM mean shift: {oskm_mean:.4f}")
+        oskm_std = oskm_df['Shift_to_goal_end'].std()
+        print(f"OSKM mean shift to iPSC: {oskm_mean:.4f} ± {oskm_std:.4f}")
+        print(f"  (positive = toward iPSC, negative = away from iPSC)")
     
     if 'Shift_to_goal_end' in random_df.columns:
         random_mean = random_df['Shift_to_goal_end'].mean()
-        print(f"Random mean shift: {random_mean:.4f}")
+        random_std = random_df['Shift_to_goal_end'].std()
+        print(f"Random mean shift to iPSC: {random_mean:.4f} ± {random_std:.4f}")
     
     if 'Shift_to_goal_end' in oskm_df.columns and 'Shift_to_goal_end' in random_df.columns:
-        fold_change = oskm_mean / random_mean if random_mean != 0 else float('inf')
-        print(f"\nFold change: {fold_change:.2f}x")
-        print(f"OSKM factors are {fold_change:.1f}x more effective")
+        # Calculate the improvement (difference between OSKM and random)
+        improvement = oskm_mean - random_mean
+        print(f"\nImprovement over random: {improvement:.4f}")
+        
+        # Calculate fold change only if both values are positive or use absolute values
+        if abs(random_mean) > 0.001:
+            fold_change = abs(oskm_mean) / abs(random_mean)
+            print(f"Absolute magnitude ratio: {fold_change:.2f}x")
+        
+        # Interpretation
+        if oskm_mean > random_mean:
+            print(f"\n✓ OSKM factors successfully shift cells TOWARD iPSC state")
+        else:
+            print(f"\n✗ OSKM factors did not perform better than random controls")
+        
     
 except Exception as e:
     print(f"Could not compare results: {e}")

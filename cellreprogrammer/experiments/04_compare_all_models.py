@@ -32,17 +32,15 @@ RESULTS_DIR = CELLREPROGRAMMER_DIR / "results"
 
 # All available Geneformer models from helical
 AVAILABLE_MODELS = [
-    # Version 1.0 models
+    # Version 1.0 models (use 2048 tokens)
     "gf-6L-10M-i2048",
     "gf-12L-40M-i2048",
     "gf-12L-40M-i2048-CZI-CellxGene",
     
-    # Version 2.0 models
+    # Version 2.0 models (use 4096 tokens)
     "gf-12L-38M-i4096",
     "gf-20L-151M-i4096",
     "gf-12L-38M-i4096-CLcancer",
-    
-    # Version 3.0 models
     "gf-12L-104M-i4096",
     "gf-12L-104M-i4096-CLcancer",
     "gf-18L-316M-i4096",
@@ -104,9 +102,18 @@ DATA_DIR = CELLREPROGRAMMER_DIR / "data"
 MODEL_NAME = "{model_name}"
 GENEFORMER_CONFIG = GeneformerConfig(model_name=MODEL_NAME, batch_size=50)
 MODEL_PATH = GENEFORMER_CONFIG.files_config["model_files_dir"]
-INPUT_DATA_PATH = DATA_DIR / "tokenized" / "fibroblast_ipsc.dataset"
+
+# Determine which tokenized dataset to use based on model version
+raw_version = GENEFORMER_CONFIG.model_map[MODEL_NAME]["model_version"].upper()
+if raw_version == "V1":
+    INPUT_DATA_PATH = DATA_DIR / "tokenized" / "fibroblast_ipsc_v1.dataset"
+else:
+    # V2 uses 4096 tokenization
+    INPUT_DATA_PATH = DATA_DIR / "tokenized" / "fibroblast_ipsc.dataset"
+
 OUTPUT_DIR = CELLREPROGRAMMER_DIR / "results" / "model_comparison" / MODEL_NAME
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(OUTPUT_DIR / "oskm", exist_ok=True)
 
 # Download model if needed
 print("Downloading model if needed...")
@@ -121,7 +128,9 @@ FILTER_DATA = {{"cell_type": ["Fibroblast", "iPSC", "Failed_reprogramming"]}}
 MAX_NCELLS = 500
 NPROC = 1
 FORWARD_BATCH_SIZE = 50
-MODEL_VERSION = GENEFORMER_CONFIG.model_map[MODEL_NAME]["model_version"].upper()
+# Map helical V3 models to original Geneformer V2
+raw_version = GENEFORMER_CONFIG.model_map[MODEL_NAME]["model_version"].upper()
+MODEL_VERSION = "V2" if raw_version == "V3" else raw_version
 
 # Step 1: Extract state embeddings
 print("Extracting state embeddings...")
@@ -314,8 +323,22 @@ if not successful_results.empty:
     print("BEST MODEL:")
     print("=" * 80)
     print(f"Model: {best_model['Model']}")
-    print(f"Mean Shift to iPSC: {best_model['Mean_Shift_to_iPSC']:.6f}")
+    shift_value = best_model['Mean_Shift_to_iPSC']
+    print(f"Mean Shift to iPSC: {shift_value:.6f}")
+    if shift_value > 0:
+        print("  Interpretation: Shifts cells TOWARD iPSC state (desired)")
+    elif shift_value < 0:
+        print("  Interpretation: Shifts cells AWAY from iPSC state (not desired)")
+    else:
+        print("  Interpretation: No significant shift detected")
     print()
+    
+    # Show top 3
+    if len(successful_results) > 1:
+        print("Top 3 models:")
+        for i, row in successful_results.head(3).iterrows():
+            print(f"  {list(successful_results.index).index(i) + 1}. {row['Model']}: {row['Mean_Shift_to_iPSC']:.6f}")
+        print()
 else:
     print("⚠️  No models completed successfully")
 

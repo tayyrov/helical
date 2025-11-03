@@ -206,15 +206,14 @@ python 04_compare_all_models.py
 ```
 
 **What it does:**
-1. Runs the OSKM experiment for each model (V1, V2, V3)
+1. Runs the OSKM experiment for each model (V1, V2)
 2. Compares mean shift to iPSC state
 3. Saves comparison CSV
 4. Prints best performing model
 
 **Models tested:**
 - V1: gf-6L-10M-i2048, gf-12L-40M-i2048, gf-12L-40M-i2048-CZI-CellxGene
-- V2: gf-12L-38M-i4096, gf-20L-151M-i4096, gf-12L-38M-i4096-CLcancer
-- V3: gf-12L-104M-i4096, gf-12L-104M-i4096-CLcancer, gf-18L-316M-i4096
+- V2: gf-12L-38M-i4096, gf-20L-151M-i4096, gf-12L-38M-i4096-CLcancer, gf-12L-104M-i4096, gf-12L-104M-i4096-CLcancer, gf-18L-316M-i4096
 
 **Output:**
 - `results/model_comparison/model_comparison_results.csv` - Full results
