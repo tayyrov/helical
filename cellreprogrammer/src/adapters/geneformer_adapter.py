@@ -105,7 +105,7 @@ class GeneformerAdapter(PerturbationAdapter):
         genes_to_perturb: List[str],
         cell_states: Dict,
         filter_data: Dict,
-        max_ncells: int = 500,
+        max_ncells: Optional[int] = None,  # None = use all available cells
         forward_batch_size: int = 50,
         nproc: int = 1,
         state_embs_dict: Optional[Dict] = None,

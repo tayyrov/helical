@@ -148,7 +148,7 @@ print()
 # COMPUTATION SETTINGS
 # =============================================================================
 
-MAX_NCELLS = 500  # Reduced for memory
+MAX_NCELLS = None  # Use all available cells for accuracy
 NPROC = 1  # Use 1 process for data filtering (Geneformer requires > 0)
 FORWARD_BATCH_SIZE = 50  # Reduced for A100 memory constraints
 MODEL_VERSION = "V2"  # Using V2 model
@@ -158,7 +158,7 @@ os.environ['DATASETS_NUM_PROC'] = '1'  # Geneformer requires at least 1
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 
 print("Computational settings:")
-print(f"  Max cells: {MAX_NCELLS}")
+print(f"  Max cells: {MAX_NCELLS if MAX_NCELLS is not None else 'All available'}")
 print(f"  Batch size: {FORWARD_BATCH_SIZE}")
 print(f"  Model version: {MODEL_VERSION}")
 print()

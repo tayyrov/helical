@@ -56,6 +56,14 @@ GENE_ALIASES = {
     "M2B": "B2M",  # Beta-2-microglobulin
 }
 
+# Standard control genes with known Ensembl IDs (for consistency with 03_reproduce_reprogramming.py)
+STANDARD_CONTROL_GENES = {
+    "GAPDH": "ENSG00000111640",
+    "ACTB": "ENSG00000075624",
+    "B2M": "ENSG00000204525",  # Beta-2-microglobulin (explicit mapping for consistency)
+    "MT-ATP6": "ENSG00000198899",
+}
+
 
 def convert_genes_to_ensembl_ids(genes: List[str]) -> List[str]:
     """
@@ -77,19 +85,27 @@ def convert_genes_to_ensembl_ids(genes: List[str]) -> List[str]:
     if all(g.startswith("ENSG") for g in genes):
         return genes
     
-    # Resolve aliases first
+    # Resolve aliases and use explicit mappings for standard control genes
     resolved_genes = []
     alias_mappings = {}
     for gene in genes:
         if gene.startswith("ENSG"):
             resolved_genes.append(gene)
         else:
-            # Check for alias
-            resolved = GENE_ALIASES.get(gene.upper(), gene)
-            if resolved != gene:
+            gene_upper = gene.upper()
+            # First check for explicit mapping in standard control genes (for consistency)
+            if gene_upper in STANDARD_CONTROL_GENES:
+                resolved = STANDARD_CONTROL_GENES[gene_upper]
                 alias_mappings[gene] = resolved
-                print(f"  Resolved alias: {gene} -> {resolved}")
-            resolved_genes.append(resolved)
+                print(f"  Using standard Ensembl ID for {gene}: {resolved}")
+                resolved_genes.append(resolved)
+            else:
+                # Check for alias
+                resolved = GENE_ALIASES.get(gene_upper, gene)
+                if resolved != gene:
+                    alias_mappings[gene] = resolved
+                    print(f"  Resolved alias: {gene} -> {resolved}")
+                resolved_genes.append(resolved)
     
     # Separate Ensembl IDs and symbols
     ensembl_ids = []
@@ -525,7 +541,13 @@ def run_geneformer_perturbation_experiment(
     random_genes = convert_genes_to_ensembl_ids(random_genes)
     print()
     
-    max_ncells = max_cells if max_cells else 500  # Geneformer default
+    # Use all cells by default for accuracy (Geneformer default is 1000, but we use None = all)
+    max_ncells = max_cells  # None means use all available cells
+    if max_ncells is None:
+        print(f"Using all available cells (max_ncells=None)")
+    else:
+        print(f"Limiting to {max_ncells} cells")
+    print()
     
     # Extract state embeddings first (if not already done)
     print("=" * 80)
@@ -751,8 +773,9 @@ def main():
                        default=None,
                        help="Output directory")
     parser.add_argument("--max-cells", type=int, default=None,
-                       help="Maximum number of cells to use (default: None = use all cells). "
-                            "Limit cells only if you need faster testing or hit memory limits.")
+                       help="Maximum number of cells to use (default: None = use all cells for accuracy). "
+                            "Limit cells only if you need faster testing or hit memory limits. "
+                            "Note: Geneformer's default is 1000, but we use all cells by default.")
     parser.add_argument("--fold-change", type=float, default=2.0,
                        help="Fold change for overexpression")
     

@@ -128,7 +128,7 @@ FILTER_DATA = {
 }
 
 # Computation settings
-MAX_NCELLS = 500
+MAX_NCELLS = None  # Use all available cells for accuracy
 NPROC = 1  # Must be > 0 for datasets library
 FORWARD_BATCH_SIZE = 50
 
@@ -163,7 +163,7 @@ print(f"  Start: {CELL_STATES['start_state']}")
 print(f"  Goal: {CELL_STATES['goal_state']}")
 print()
 print("Computational settings:")
-print(f"  Max cells: {MAX_NCELLS}")
+print(f"  Max cells: {MAX_NCELLS if MAX_NCELLS is not None else 'All available'}")
 print(f"  Batch size: {FORWARD_BATCH_SIZE}")
 print(f"  Model version: {MODEL_VERSION}")
 print()

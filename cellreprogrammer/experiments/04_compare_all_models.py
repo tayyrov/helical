@@ -125,7 +125,7 @@ for file in GENEFORMER_CONFIG.list_of_files_to_download:
 OSKM_FACTORS = ["ENSG00000204531", "ENSG00000181449", "ENSG00000136826", "ENSG00000136997"]
 CELL_STATES = {{"state_key": "cell_type", "start_state": "Fibroblast", "goal_state": "iPSC", "alt_states": []}}
 FILTER_DATA = {{"cell_type": ["Fibroblast", "iPSC", "Failed_reprogramming"]}}
-MAX_NCELLS = 500
+MAX_NCELLS = None  # Use all available cells for accuracy
 NPROC = 1
 FORWARD_BATCH_SIZE = 50
 # Map helical V3 models to original Geneformer V2
