@@ -58,3 +58,6 @@ outputs
 
 # Vortex repo
 vortex
+
+# Learning concepts folder (personal educational notes)
+learning_concepts/
