@@ -48,6 +48,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 # Import helical's model config and constants
 from helical.models.geneformer import GeneformerConfig
 from helical.constants.paths import CACHE_DIR_HELICAL
+from src.utils import calculate_fold_improvement
 
 # =============================================================================
 # CONFIGURATION
@@ -382,12 +383,22 @@ try:
         improvement = oskm_mean - random_mean
         print(f"\nImprovement over random: {improvement:.4f}")
         
-        # Calculate fold change only if both values are positive or use absolute values
-        if abs(random_mean) > 0.001:
-            fold_change = abs(oskm_mean) / abs(random_mean)
-            print(f"Absolute magnitude ratio: {fold_change:.2f}x")
+        # Calculate fold improvement using shared utility (only when same sign)
+        fold_improvement = calculate_fold_improvement(oskm_mean, random_mean, threshold=1e-6)
         
-        # Interpretation
+        if fold_improvement:
+            # Both have same sign - fold change is meaningful
+            print(f"Fold improvement: {fold_improvement:.2f}x")
+        elif oskm_mean > 0 and random_mean < 0:
+            # OSKM positive (toward), random negative (away) - very strong result
+            print(f"\n✓ Strong result: OSKM factors shift cells TOWARD iPSC, while random controls shift AWAY")
+            print(f"  This indicates OSKM factors have a clear positive effect on reprogramming")
+        elif oskm_mean < 0 and random_mean > 0:
+            # OSKM negative, random positive - unexpected result
+            print(f"\n⚠ Unexpected: OSKM factors shift cells AWAY from iPSC, while random controls shift toward")
+            print(f"  This may indicate an issue with the perturbation or analysis")
+        
+        # Overall interpretation
         if oskm_mean > random_mean:
             print(f"\n✓ OSKM factors successfully shift cells TOWARD iPSC state")
         else:
