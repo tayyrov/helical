@@ -65,16 +65,33 @@ class scGPTAdapter(PerturbationAdapter):
                         symbol = adata_work.var.loc[idx, "gene_names"]
                         self.ensembl_to_symbol[ensembl_id] = symbol
                 
+                # Filter out any None gene names first
+                adata_work = adata_work[:, adata_work.var["gene_names"].notna()]
+                
                 # Set gene_names as var_names for scGPT
-                old_var_names = adata_work.var_names.copy()
                 # Fill NaN values with original var_names (convert Index to Series)
                 gene_names_series = adata_work.var["gene_names"].copy()
                 # Create a Series from the index to use as fill values
                 index_series = pd.Series(adata_work.var.index, index=adata_work.var.index)
                 gene_names_series = gene_names_series.fillna(index_series)
-                adata_work.var_names = gene_names_series.values
-                # Filter out any None gene names
-                adata_work = adata_work[:, adata_work.var["gene_names"].notna()]
+                
+                # Before setting var_names, aggregate duplicate gene symbols
+                # (Multiple Ensembl IDs can map to same gene symbol)
+                if gene_names_series.duplicated().any():
+                    print(f"  Aggregating {gene_names_series.duplicated().sum()} duplicate gene symbols...")
+                    import scanpy as sc
+                    # Temporarily set gene_names as var_names for aggregation
+                    adata_work.var["temp_gene_names"] = gene_names_series.values
+                    # Aggregate by summing expression values for duplicate gene symbols
+                    adata_work.var_names = gene_names_series.values
+                    adata_work = adata_work.aggregate_by(adata_work.var_names, func="sum")
+                    # Clean up temp column if it exists
+                    if "temp_gene_names" in adata_work.var.columns:
+                        del adata_work.var["temp_gene_names"]
+                else:
+                    # No duplicates, just set var_names
+                    adata_work.var_names = gene_names_series.values
+                
                 print(f"✓ Converted to gene symbols: {adata_work.n_vars} genes with valid symbols")
             else:
                 print("⚠ Warning: No gene_names column created. Using original var_names.")
