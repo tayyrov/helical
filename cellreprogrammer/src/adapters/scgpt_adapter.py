@@ -68,29 +68,63 @@ class scGPTAdapter(PerturbationAdapter):
                 # Filter out any None gene names first
                 adata_work = adata_work[:, adata_work.var["gene_names"].notna()]
                 
-                # Set gene_names as var_names for scGPT
                 # Fill NaN values with original var_names (convert Index to Series)
                 gene_names_series = adata_work.var["gene_names"].copy()
-                # Create a Series from the index to use as fill values
                 index_series = pd.Series(adata_work.var.index, index=adata_work.var.index)
                 gene_names_series = gene_names_series.fillna(index_series)
                 
-                # Before setting var_names, aggregate duplicate gene symbols
+                # Aggregate duplicate gene symbols by summing expression
                 # (Multiple Ensembl IDs can map to same gene symbol)
                 if gene_names_series.duplicated().any():
-                    print(f"  Aggregating {gene_names_series.duplicated().sum()} duplicate gene symbols...")
-                    import scanpy as sc
-                    # Temporarily set gene_names as var_names for aggregation
-                    adata_work.var["temp_gene_names"] = gene_names_series.values
-                    # Aggregate by summing expression values for duplicate gene symbols
-                    adata_work.var_names = gene_names_series.values
-                    adata_work = adata_work.aggregate_by(adata_work.var_names, func="sum")
-                    # Clean up temp column if it exists
-                    if "temp_gene_names" in adata_work.var.columns:
-                        del adata_work.var["temp_gene_names"]
+                    n_duplicates = gene_names_series.duplicated().sum()
+                    print(f"  Aggregating {n_duplicates} duplicate gene symbols...")
+                    
+                    # Set gene_names as var_names temporarily for aggregation
+                    adata_work.var["temp_gene_symbols"] = gene_names_series.values
+                    
+                    # Group by gene symbol and sum expression values
+                    # We'll create a new AnnData with aggregated genes
+                    from scipy import sparse
+                    
+                    # Get expression matrix
+                    X = adata_work.X
+                    if sparse.issparse(X):
+                        X = X.toarray()
+                    
+                    # Create DataFrame with gene symbols as columns
+                    expr_df = pd.DataFrame(X, index=adata_work.obs_names, columns=gene_names_series.values)
+                    
+                    # Group by gene symbol and sum
+                    expr_df_agg = expr_df.groupby(by=expr_df.columns, axis=1).sum()
+                    
+                    # Create new AnnData with aggregated expression
+                    # Use first occurrence of each gene symbol for metadata
+                    unique_symbols = expr_df_agg.columns.tolist()
+                    var_mask = ~gene_names_series.duplicated(keep='first')
+                    var_agg = adata_work.var[var_mask].copy()
+                    var_agg = var_agg[var_agg["temp_gene_symbols"].isin(unique_symbols)]
+                    var_agg = var_agg.set_index("temp_gene_symbols")
+                    var_agg = var_agg.loc[unique_symbols]  # Reorder to match aggregation order
+                    var_agg.index.name = None
+                    
+                    # Create aggregated AnnData
+                    adata_work = ad.AnnData(
+                        X=expr_df_agg.values,
+                        obs=adata_work.obs.copy(),
+                        var=var_agg.copy()
+                    )
+                    adata_work.var_names = unique_symbols
+                    # Ensure gene_names column exists for scGPT
+                    if "gene_names" not in adata_work.var.columns:
+                        adata_work.var["gene_names"] = adata_work.var_names
+                    
+                    print(f"  ✓ Aggregated to {len(unique_symbols)} unique genes")
                 else:
                     # No duplicates, just set var_names
                     adata_work.var_names = gene_names_series.values
+                    # Ensure gene_names column exists for scGPT
+                    if "gene_names" not in adata_work.var.columns:
+                        adata_work.var["gene_names"] = adata_work.var_names
                 
                 print(f"✓ Converted to gene symbols: {adata_work.n_vars} genes with valid symbols")
             else:
