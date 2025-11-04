@@ -67,7 +67,10 @@ class scGPTAdapter(PerturbationAdapter):
                 
                 # Set gene_names as var_names for scGPT
                 old_var_names = adata_work.var_names.copy()
-                adata_work.var_names = adata_work.var["gene_names"].fillna(adata_work.var_names)
+                # Fill NaN values with original var_names (convert Index to Series first)
+                gene_names_series = adata_work.var["gene_names"].copy()
+                gene_names_series = gene_names_series.fillna(adata_work.var.index)
+                adata_work.var_names = gene_names_series.values
                 # Filter out any None gene names
                 adata_work = adata_work[:, adata_work.var["gene_names"].notna()]
                 print(f"✓ Converted to gene symbols: {adata_work.n_vars} genes with valid symbols")
