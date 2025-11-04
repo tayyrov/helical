@@ -151,14 +151,76 @@ MODEL_REGISTRY = {
         "config_class": GeneformerConfig,
         "adapter_class": GeneformerAdapter,
         "default_config": {"model_name": "gf-20L-151M-i4096", "batch_size": 50},
+        "unsupported_params": {
+            "fold_change": {
+                "reason": "Geneformer perturbs genes by moving them to the front of tokenized sequences, not by modifying expression values."
+            }
+        },
     },
     "scgpt": {
         "model_class": scGPT,
         "config_class": scGPTConfig,
         "adapter_class": scGPTAdapter,
         "default_config": {"batch_size": 50},  # device will be added dynamically
+        "unsupported_params": {},  # scGPT supports all parameters
     },
 }
+
+
+def format_gene_list_for_display(original_genes: List[str], ensembl_ids: List[str]) -> str:
+    """
+    Format gene list for display, showing original names with Ensembl IDs in parentheses.
+    
+    Parameters
+    ----------
+    original_genes : List[str]
+        Original gene names (symbols or Ensembl IDs as provided by user)
+    ensembl_ids : List[str]
+        Ensembl IDs (may be the same as original if already Ensembl IDs)
+        
+    Returns
+    -------
+    str
+        Formatted string like "OCT4 (ENSG00000204531), SOX2 (ENSG00000181449)"
+    """
+    formatted = []
+    for orig, eid in zip(original_genes, ensembl_ids):
+        if orig.startswith("ENSG"):
+            # Original was already Ensembl ID, just show it
+            formatted.append(eid)
+        else:
+            # Show symbol with Ensembl ID in parentheses
+            formatted.append(f"{orig} ({eid})")
+    return ", ".join(formatted)
+
+
+def warn_about_unsupported_params(model_name: str, **kwargs):
+    """
+    Warn about parameters that are not supported by the specified model.
+    
+    Parameters
+    ----------
+    model_name : str
+        Name of the model
+    **kwargs
+        Parameters provided by user
+    """
+    if model_name not in MODEL_REGISTRY:
+        return
+    
+    unsupported = MODEL_REGISTRY[model_name].get("unsupported_params", {})
+    
+    warned = False
+    for param_name, param_info in unsupported.items():
+        if param_name in kwargs and kwargs[param_name] is not None:
+            if not warned:
+                print("⚠ WARNING: Some parameters are not supported by this model and will be ignored:")
+                warned = True
+            reason = param_info.get("reason", "This parameter is not used by this model.")
+            print(f"  • --{param_name.replace('_', '-')}: {reason}")
+    
+    if warned:
+        print()
 
 
 def load_data(data_path: Path):
@@ -392,12 +454,8 @@ def run_geneformer_perturbation_experiment(
     print("=" * 80)
     print()
     
-    # Warn about fold_change if provided
-    if fold_change is not None:
-        print("⚠ WARNING: Geneformer doesn't support fold_change parameter.")
-        print("  Geneformer perturbs genes by moving them to the front of tokenized sequences.")
-        print("  The --fold-change parameter will be ignored.")
-        print()
+    # Warn about unsupported parameters
+    warn_about_unsupported_params(model_name, fold_change=fold_change)
     
     # Get model config
     if model_name not in MODEL_REGISTRY:
@@ -511,7 +569,7 @@ def run_geneformer_perturbation_experiment(
     
     # Run target genes perturbation
     print("=" * 80)
-    print(f"Testing target genes: {', '.join(genes_to_perturb)}")
+    print(f"Testing target genes: {format_gene_list_for_display(original_target_genes, genes_to_perturb)}")
     print("=" * 80)
     
     target_output_dir = output_dir / "target"
@@ -563,7 +621,7 @@ def run_geneformer_perturbation_experiment(
     
     # Run random control genes perturbation
     print("=" * 80)
-    print(f"Testing random control genes: {', '.join(random_genes)}")
+    print(f"Testing random control genes: {format_gene_list_for_display(original_random_genes, random_genes)}")
     print("=" * 80)
     
     random_output_dir = output_dir / "random"
