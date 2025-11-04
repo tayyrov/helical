@@ -35,8 +35,9 @@ if not BASE_DIR.exists():
 
 CELLREPROGRAMMER_DIR = BASE_DIR / "cellreprogrammer"
 
-# Import helical's GeneformerConfig
+# Import helical's GeneformerConfig and Downloader
 from helical.models.geneformer.geneformer_config import GeneformerConfig
+from helical.utils.downloader import Downloader
 
 # Try to import original Geneformer utilities
 try:
@@ -67,8 +68,27 @@ GENEFORMER_CONFIG = GeneformerConfig(model_name=MODEL_NAME, batch_size=50)
 
 # Ensure model is downloaded
 print("Ensuring model is downloaded via helical...")
+downloader = Downloader()
+for file in GENEFORMER_CONFIG.list_of_files_to_download:
+    downloader.download_via_name(file)
+print("✓ Model files downloaded")
+
 MODEL_PATH = GENEFORMER_CONFIG.files_config["model_files_dir"]
 print(f"✓ Model path: {MODEL_PATH}")
+
+# Verify model path exists and contains required files
+if not MODEL_PATH.exists():
+    raise FileNotFoundError(f"Model directory does not exist: {MODEL_PATH}")
+
+required_files = ["config.json"]
+if (MODEL_PATH / "model.safetensors").exists():
+    required_files.append("model.safetensors")
+elif (MODEL_PATH / "pytorch_model.bin").exists():
+    required_files.append("pytorch_model.bin")
+else:
+    raise FileNotFoundError(f"Model weights file not found in {MODEL_PATH}")
+
+print(f"✓ Model files verified: {', '.join(required_files)}")
 print()
 
 # Paths - relative to cellreprogrammer directory
