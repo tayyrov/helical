@@ -219,7 +219,7 @@ def run_generic_perturbation_experiment(
     
     # Calculate fold improvement for CSV
     csv_fold_improvement = None
-    if abs(np.mean(random_shifts)) > 1e-6:
+    if abs(np.mean(random_shifts)) > 1e-8:  # Use smaller threshold to catch very small shifts
         csv_fold_improvement = abs(np.mean(shifts)) / abs(np.mean(random_shifts))
     
     summary = pd.DataFrame([{
@@ -245,7 +245,7 @@ def run_generic_perturbation_experiment(
     
     # Calculate fold-change improvement if meaningful
     fold_improvement = None
-    if abs(random_mean) > 1e-6:
+    if abs(random_mean) > 1e-8:  # Use smaller threshold to catch very small shifts
         fold_improvement = abs(target_mean) / abs(random_mean)
     
     print("=" * 80)
