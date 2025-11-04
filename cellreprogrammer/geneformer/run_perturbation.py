@@ -11,11 +11,19 @@ from typing import List, Optional
 import pandas as pd
 
 from helical.models.geneformer import GeneformerConfig, Geneformer
-from cellreprogrammer.src.adapters import GeneformerAdapter
 from helical.utils.downloader import Downloader
 from helical.utils.mapping import convert_list_gene_symbols_to_ensembl_ids
 
-from cellreprogrammer.src.utils import calculate_fold_improvement, format_perturbation_results
+# Import from src (cellreprogrammer directory should be in sys.path)
+import sys
+from pathlib import Path
+# Ensure cellreprogrammer directory is in sys.path (go up 2 levels from geneformer/run_perturbation.py)
+cellreprogrammer_dir = Path(__file__).resolve().parent.parent
+if str(cellreprogrammer_dir) not in sys.path:
+    sys.path.insert(0, str(cellreprogrammer_dir))
+
+from src.adapters import GeneformerAdapter
+from src.utils import calculate_fold_improvement, format_perturbation_results
 
 
 # Standard control genes with explicit Ensembl ID mappings for consistency

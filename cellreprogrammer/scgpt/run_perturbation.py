@@ -14,9 +14,18 @@ import torch
 import anndata as ad
 
 from helical.models.scgpt import scGPT, scGPTConfig
-from cellreprogrammer.src.adapters import scGPTAdapter
 from helical.utils.downloader import Downloader
-from cellreprogrammer.src.utils import calculate_fold_improvement, format_perturbation_results
+
+# Import from src (cellreprogrammer directory should be in sys.path)
+import sys
+from pathlib import Path
+# Ensure cellreprogrammer directory is in sys.path (go up 2 levels from scgpt/run_perturbation.py)
+cellreprogrammer_dir = Path(__file__).resolve().parent.parent
+if str(cellreprogrammer_dir) not in sys.path:
+    sys.path.insert(0, str(cellreprogrammer_dir))
+
+from src.adapters import scGPTAdapter
+from src.utils import calculate_fold_improvement, format_perturbation_results
 
 
 def get_device():
