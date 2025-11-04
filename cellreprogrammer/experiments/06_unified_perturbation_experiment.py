@@ -49,10 +49,19 @@ def get_device():
     return device
 
 
+# Common gene symbol aliases (common name -> official symbol)
+GENE_ALIASES = {
+    "OCT4": "POU5F1",  # OCT4 is the common name, POU5F1 is the official symbol
+    "OCT-4": "POU5F1",
+    "M2B": "B2M",  # Beta-2-microglobulin
+}
+
+
 def convert_genes_to_ensembl_ids(genes: List[str]) -> List[str]:
     """
     Convert gene symbols to Ensembl IDs if needed.
     Handles mixed inputs (some symbols, some Ensembl IDs).
+    Automatically resolves common aliases (e.g., OCT4 -> POU5F1).
     
     Parameters
     ----------
@@ -68,12 +77,26 @@ def convert_genes_to_ensembl_ids(genes: List[str]) -> List[str]:
     if all(g.startswith("ENSG") for g in genes):
         return genes
     
+    # Resolve aliases first
+    resolved_genes = []
+    alias_mappings = {}
+    for gene in genes:
+        if gene.startswith("ENSG"):
+            resolved_genes.append(gene)
+        else:
+            # Check for alias
+            resolved = GENE_ALIASES.get(gene.upper(), gene)
+            if resolved != gene:
+                alias_mappings[gene] = resolved
+                print(f"  Resolved alias: {gene} -> {resolved}")
+            resolved_genes.append(resolved)
+    
     # Separate Ensembl IDs and symbols
     ensembl_ids = []
     symbols_to_convert = []
     indices_to_convert = []
     
-    for i, gene in enumerate(genes):
+    for i, gene in enumerate(resolved_genes):
         if gene.startswith("ENSG"):
             ensembl_ids.append(gene)
         else:
@@ -90,13 +113,30 @@ def convert_genes_to_ensembl_ids(genes: List[str]) -> List[str]:
         for idx, eid in zip(indices_to_convert, converted_ids):
             ensembl_ids[idx] = eid
         
-        # Check for failures
-        failed = [g for g, eid in zip(symbols_to_convert, converted_ids) if eid is None]
-        if failed:
-            raise ValueError(
-                f"Could not map the following genes to Ensembl IDs: {failed}\n"
-                f"Please check spelling or provide Ensembl IDs directly (e.g., ENSG00000204531)"
-            )
+        # Check for failures and track original names
+        failed_symbols = []
+        failed_original_names = []
+        
+        # Map back to original gene names
+        original_names_by_symbol = {}
+        for i, (original, resolved) in enumerate(zip(genes, resolved_genes)):
+            if not original.startswith("ENSG"):
+                original_names_by_symbol[resolved] = original
+        
+        for symbol, eid in zip(symbols_to_convert, converted_ids):
+            if eid is None:
+                failed_symbols.append(symbol)
+                # Get original name (before alias resolution)
+                original_name = original_names_by_symbol.get(symbol, symbol)
+                failed_original_names.append(original_name)
+        
+        if failed_symbols:
+            error_msg = f"Could not map the following genes to Ensembl IDs: {failed_original_names}"
+            # Add alias suggestions
+            if alias_mappings:
+                error_msg += f"\n(Aliases were resolved: {alias_mappings})"
+            error_msg += "\nPlease check spelling or provide Ensembl IDs directly (e.g., ENSG00000204531)"
+            raise ValueError(error_msg)
         
         print(f"✓ Converted {len(symbols_to_convert)} gene symbol(s) to Ensembl IDs")
     
