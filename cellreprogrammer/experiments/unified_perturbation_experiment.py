@@ -24,8 +24,22 @@ CELLREPROGRAMMER_DIR = BASE_DIR / "cellreprogrammer"
 sys.path.insert(0, str(CELLREPROGRAMMER_DIR))
 
 # Import model-specific perturbation functions
-from geneformer.run_perturbation import run_perturbation_experiment as run_geneformer_perturbation
-from scgpt.run_perturbation import run_perturbation_experiment as run_scgpt_perturbation
+# Note: Import directly from the module files (geneformer/ is not a package to avoid name collision)
+import importlib.util
+
+# Load geneformer perturbation function
+geneformer_module_path = CELLREPROGRAMMER_DIR / "geneformer" / "run_perturbation.py"
+spec = importlib.util.spec_from_file_location("geneformer_run_perturbation", geneformer_module_path)
+geneformer_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(geneformer_module)
+run_geneformer_perturbation = geneformer_module.run_perturbation_experiment
+
+# Load scgpt perturbation function  
+scgpt_module_path = CELLREPROGRAMMER_DIR / "scgpt" / "run_perturbation.py"
+spec = importlib.util.spec_from_file_location("scgpt_run_perturbation", scgpt_module_path)
+scgpt_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(scgpt_module)
+run_scgpt_perturbation = scgpt_module.run_perturbation_experiment
 
 # Model routing map
 MODEL_ROUTER = {

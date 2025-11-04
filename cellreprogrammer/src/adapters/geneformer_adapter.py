@@ -14,18 +14,9 @@ import anndata as ad
 
 from .base_adapter import PerturbationAdapter
 
-# Try to import original Geneformer utilities
-try:
-    from geneformer import InSilicoPerturber, EmbExtractor, InSilicoPerturberStats
-except ImportError:
-    GENEFORMER_REPO = Path("/home/ubuntu/data-at-virginia/Geneformer")
-    if GENEFORMER_REPO.exists():
-        sys.path.insert(0, str(GENEFORMER_REPO))
-        from geneformer import InSilicoPerturber, EmbExtractor, InSilicoPerturberStats
-    else:
-        InSilicoPerturber = None
-        EmbExtractor = None
-        InSilicoPerturberStats = None
+# Import original Geneformer utilities
+# Note: Assumes geneformer is installed in the active venv (e.g., pip install -e ../Geneformer)
+from geneformer import InSilicoPerturber, EmbExtractor, InSilicoPerturberStats
 
 
 class GeneformerAdapter(PerturbationAdapter):
