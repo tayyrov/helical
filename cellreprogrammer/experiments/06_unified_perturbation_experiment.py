@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 # Path setup
 script_dir = Path(__file__).resolve().parent
@@ -34,9 +34,22 @@ from src.adapters import GeneformerAdapter, scGPTAdapter
 from helical.models.geneformer import Geneformer, GeneformerConfig
 from helical.models.scgpt import scGPT, scGPTConfig
 from helical.utils.downloader import Downloader
+import torch
+
+# Detect available device
+def get_device():
+    """Detect and return the best available device (CUDA if available, else CPU)."""
+    if torch.cuda.is_available():
+        device = "cuda"
+        print(f"✓ GPU detected: {torch.cuda.get_device_name(0)}")
+    else:
+        device = "cpu"
+        print("⚠ No GPU detected, using CPU")
+    return device
 
 
 # Model factory
+# Note: device detection happens at runtime in run_generic_perturbation_experiment
 MODEL_REGISTRY = {
     "geneformer": {
         "model_class": Geneformer,
@@ -48,7 +61,7 @@ MODEL_REGISTRY = {
         "model_class": scGPT,
         "config_class": scGPTConfig,
         "adapter_class": scGPTAdapter,
-        "default_config": {"batch_size": 50},
+        "default_config": {"batch_size": 50},  # device will be added dynamically
     },
 }
 
@@ -67,7 +80,7 @@ def run_generic_perturbation_experiment(
     output_dir: Path,
     start_state: str = "Fibroblast",
     goal_state: str = "iPSC",
-    max_cells: int = 500,
+    max_cells: Optional[int] = None,  # None = use all cells (recommended for accuracy)
     fold_change: float = 2.0,
 ):
     """
@@ -89,7 +102,13 @@ def run_generic_perturbation_experiment(
     config_class = registry["config_class"]
     model_class = registry["model_class"]
     adapter_class = registry["adapter_class"]
-    default_config = registry["default_config"]
+    default_config = registry["default_config"].copy()  # Copy to avoid modifying original
+    
+    # Auto-detect device for scGPT
+    if model_name == "scgpt" and "device" not in default_config:
+        device = get_device()
+        default_config["device"] = device
+        print(f"Using device: {device}")
     
     # Create config and model
     print(f"Initializing {model_name}...")
@@ -117,18 +136,22 @@ def run_generic_perturbation_experiment(
         adata = adata[adata.obs['cell_type'] == start_state].copy()
         print(f"✓ Filtered to {start_state}: {adata.n_obs} cells")
     
-    # Limit cells
+    # Limit cells if requested (using all cells is recommended for accuracy)
     if max_cells and adata.n_obs > max_cells:
         import scanpy as sc
+        print(f"⚠ Limiting to {max_cells} cells (for faster testing)")
+        print(f"  Note: Using all {adata.n_obs} cells would be more accurate")
         sc.pp.subsample(adata, n_obs=max_cells, random_state=42)
         print(f"✓ Subsampled to {max_cells} cells")
+    elif max_cells is None:
+        print(f"✓ Using all {adata.n_obs} cells (recommended for accuracy)")
     print()
     
     # Extract goal state embeddings (for comparison)
     print(f"Extracting goal state embeddings ({goal_state})...")
     goal_adata = load_data(data_path)
     goal_adata = goal_adata[goal_adata.obs['cell_type'] == goal_state].copy()
-    if goal_adata.n_obs > max_cells:
+    if max_cells and goal_adata.n_obs > max_cells:
         import scanpy as sc
         sc.pp.subsample(goal_adata, n_obs=max_cells, random_state=42)
     
@@ -234,8 +257,9 @@ def main():
     parser.add_argument("--output", type=Path,
                        default=None,
                        help="Output directory")
-    parser.add_argument("--max-cells", type=int, default=500,
-                       help="Maximum number of cells to use")
+    parser.add_argument("--max-cells", type=int, default=None,
+                       help="Maximum number of cells to use (default: None = use all cells). "
+                            "Limit cells only if you need faster testing or hit memory limits.")
     parser.add_argument("--fold-change", type=float, default=2.0,
                        help="Fold change for overexpression")
     
