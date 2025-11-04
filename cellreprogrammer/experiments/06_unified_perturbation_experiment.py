@@ -217,24 +217,57 @@ def run_generic_perturbation_experiment(
     })
     results.to_csv(output_dir / f"{model_name}_perturbation_results.csv", index=False)
     
+    # Calculate fold improvement for CSV
+    csv_fold_improvement = None
+    if abs(np.mean(random_shifts)) > 1e-6:
+        csv_fold_improvement = abs(np.mean(shifts)) / abs(np.mean(random_shifts))
+    
     summary = pd.DataFrame([{
         'model': model_name,
         'target_genes': ', '.join(genes_to_perturb),
         'random_genes': ', '.join(random_genes),
+        'fold_change': fold_change,
         'target_mean_shift': np.mean(shifts),
         'target_std_shift': np.std(shifts),
         'random_mean_shift': np.mean(random_shifts),
         'random_std_shift': np.std(random_shifts),
         'improvement': np.mean(shifts) - np.mean(random_shifts),
+        'fold_improvement': csv_fold_improvement if csv_fold_improvement else None,
     }])
     summary.to_csv(output_dir / f"{model_name}_summary.csv", index=False)
     
+    # Calculate summary statistics
+    target_mean = np.mean(shifts)
+    target_std = np.std(shifts)
+    random_mean = np.mean(random_shifts)
+    random_std = np.std(random_shifts)
+    improvement = target_mean - random_mean
+    
+    # Calculate fold-change improvement if meaningful
+    fold_improvement = None
+    if abs(random_mean) > 1e-6:
+        fold_improvement = abs(target_mean) / abs(random_mean)
+    
     print("=" * 80)
-    print("RESULTS")
+    print("RESULTS SUMMARY")
     print("=" * 80)
-    print(f"Target genes shift: {np.mean(shifts):.6f} ± {np.std(shifts):.6f}")
-    print(f"Random genes shift: {np.mean(random_shifts):.6f} ± {np.std(random_shifts):.6f}")
-    print(f"Improvement: {np.mean(shifts) - np.mean(random_shifts):.6f}")
+    print()
+    print(f"When {', '.join(genes_to_perturb)} were overexpressed {fold_change}x:")
+    print(f"  • Mean shift toward {goal_state}: {target_mean:+.6f} ± {target_std:.6f}")
+    if random_mean > 0:
+        print(f"  • Random controls shift: {random_mean:+.6f} ± {random_std:.6f}")
+    else:
+        print(f"  • Random controls shift: {random_mean:.6f} ± {random_std:.6f}")
+    print()
+    
+    if fold_improvement and fold_improvement > 1.0:
+        print(f"✓ Target genes showed {fold_improvement:.2f}x better shift toward {goal_state}")
+        print(f"  compared to random controls ({', '.join(random_genes)})")
+    elif improvement > 0:
+        print(f"✓ Target genes shifted cells {improvement:+.6f} closer to {goal_state}")
+        print(f"  compared to random controls ({', '.join(random_genes)})")
+    else:
+        print(f"✗ Target genes did not show improvement over random controls")
     print()
     print(f"Results saved to: {output_dir}")
     print()
@@ -252,8 +285,8 @@ def main():
     parser.add_argument("--genes", nargs="+", required=True,
                        help="Genes to perturb (symbols or Ensembl IDs)")
     parser.add_argument("--random", nargs="+",
-                       default=["GAPDH", "ACTB"],
-                       help="Random control genes")
+                       default=["GAPDH", "ACTB", "B2M", "MT-ATP6"],
+                       help="Random control genes (default: 4 genes to match typical OSKM perturbations)")
     parser.add_argument("--output", type=Path,
                        default=None,
                        help="Output directory")
