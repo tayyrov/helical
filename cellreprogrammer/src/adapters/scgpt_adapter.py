@@ -12,6 +12,7 @@ import anndata as ad
 import pandas as pd
 
 from .base_adapter import PerturbationAdapter
+from helical.utils.mapping import map_ensembl_ids_to_gene_symbols
 
 
 class scGPTAdapter(PerturbationAdapter):
@@ -28,9 +29,61 @@ class scGPTAdapter(PerturbationAdapter):
     
     def process_data(self, adata: ad.AnnData, **kwargs) -> Dataset:
         """Process AnnData using scGPT tokenizer."""
-        # Store original for perturbation
+        # Check if we need to convert Ensembl IDs to gene symbols
+        # scGPT expects gene symbols, but data prepared for Geneformer uses Ensembl IDs
+        adata_work = adata.copy()
+        
+        # Check if var_names look like Ensembl IDs
+        if adata_work.var_names.str.startswith("ENSG").any() or "ensembl_id" in adata_work.var.columns:
+            # Need to convert Ensembl IDs to gene symbols
+            if "ensembl_id" in adata_work.var.columns:
+                # Use existing ensembl_id column
+                ensembl_key = "ensembl_id"
+            elif adata_work.var_names.str.startswith("ENSG").all():
+                # var_names are Ensembl IDs
+                adata_work.var["ensembl_id"] = adata_work.var_names
+                ensembl_key = "ensembl_id"
+            else:
+                # Try to find ensembl_id column or create from var_names
+                ensembl_key = "ensembl_id"
+                if ensembl_key not in adata_work.var.columns:
+                    # Assume var_names are Ensembl IDs if they start with ENSG
+                    adata_work.var[ensembl_key] = adata_work.var_names
+            
+            # Convert Ensembl IDs to gene symbols
+            print("Converting Ensembl IDs to gene symbols for scGPT...")
+            adata_work = map_ensembl_ids_to_gene_symbols(adata_work, ensembl_id_key=ensembl_key)
+            
+            # Use gene_names column for scGPT
+            if "gene_names" in adata_work.var.columns:
+                # Keep ensembl_id for mapping, but use gene_names for var_names
+                # Store mapping: ensembl_id -> gene_symbol
+                self.ensembl_to_symbol = {}
+                for idx in adata_work.var.index:
+                    if pd.notna(adata_work.var.loc[idx, "gene_names"]):
+                        ensembl_id = adata_work.var.loc[idx, ensembl_key]
+                        symbol = adata_work.var.loc[idx, "gene_names"]
+                        self.ensembl_to_symbol[ensembl_id] = symbol
+                
+                # Set gene_names as var_names for scGPT
+                old_var_names = adata_work.var_names.copy()
+                adata_work.var_names = adata_work.var["gene_names"].fillna(adata_work.var_names)
+                # Filter out any None gene names
+                adata_work = adata_work[:, adata_work.var["gene_names"].notna()]
+                print(f"✓ Converted to gene symbols: {adata_work.n_vars} genes with valid symbols")
+            else:
+                print("⚠ Warning: No gene_names column created. Using original var_names.")
+                self.ensembl_to_symbol = {}
+        else:
+            self.ensembl_to_symbol = {}
+        
+        # Store original for perturbation (keep Ensembl IDs for gene mapping)
         self.original_adata = adata.copy()
-        return self.model.process_data(adata, **kwargs)
+        self.processed_adata = adata_work.copy()  # Store processed version
+        
+        # Process with scGPT (use gene_names if available, else index)
+        gene_names_param = "gene_names" if "gene_names" in adata_work.var.columns else "index"
+        return self.model.process_data(adata_work, gene_names=gene_names_param, **kwargs)
     
     def extract_embeddings(
         self, 
@@ -75,29 +128,57 @@ class scGPTAdapter(PerturbationAdapter):
                 "Original AnnData not stored. Call process_data() first."
             )
         
-        # Create perturbed copy
-        perturbed_adata = self.original_adata.copy()
+        # Create perturbed copy from processed version (has gene symbols)
+        if hasattr(self, 'processed_adata'):
+            perturbed_adata = self.processed_adata.copy()
+        else:
+            # Fallback: create from original and convert
+            perturbed_adata = self.original_adata.copy()
+            if perturbed_adata.var_names.str.startswith("ENSG").any():
+                if "ensembl_id" not in perturbed_adata.var.columns:
+                    perturbed_adata.var["ensembl_id"] = perturbed_adata.var_names
+                perturbed_adata = map_ensembl_ids_to_gene_symbols(perturbed_adata, ensembl_id_key="ensembl_id")
+                if "gene_names" in perturbed_adata.var.columns:
+                    perturbed_adata.var_names = perturbed_adata.var["gene_names"].fillna(perturbed_adata.var_names)
+                    perturbed_adata = perturbed_adata[:, perturbed_adata.var["gene_names"].notna()]
         
-        # Find genes in AnnData (try both var_names and gene columns)
+        # Find genes in AnnData (use var_names which should be gene symbols now)
         gene_names = perturbed_adata.var_names.tolist()
         
-        # Try to map Ensembl IDs to gene symbols if needed
+        # Try to map genes (handle both Ensembl IDs and gene symbols)
         genes_to_modify = []
-        for gene in genes_to_perturb:
-            # Direct match
-            if gene in gene_names:
-                genes_to_modify.append(gene)
-            # Try case-insensitive
-            elif gene.upper() in [g.upper() for g in gene_names]:
-                idx = [g.upper() for g in gene_names].index(gene.upper())
-                genes_to_modify.append(gene_names[idx])
-            # Try matching in var columns (gene_name, gene_symbol, etc.)
-            else:
-                for col in perturbed_adata.var.columns:
-                    if gene in perturbed_adata.var[col].values:
-                        matched_genes = perturbed_adata.var[perturbed_adata.var[col] == gene].index
-                        genes_to_modify.extend(matched_genes.tolist())
-                        break
+        
+        # If original data has Ensembl IDs, we might need to convert input genes
+        # Check if input looks like Ensembl IDs
+        input_are_ensembl = all(g.startswith("ENSG") for g in genes_to_perturb)
+        
+        if input_are_ensembl and hasattr(self, 'ensembl_to_symbol') and self.ensembl_to_symbol:
+            # Convert Ensembl IDs to gene symbols using the mapping we already created
+            for gene in genes_to_perturb:
+                if gene in self.ensembl_to_symbol:
+                    symbol = self.ensembl_to_symbol[gene]
+                    if symbol in gene_names:
+                        genes_to_modify.append(symbol)
+                    elif symbol.upper() in [g.upper() for g in gene_names]:
+                        idx = [g.upper() for g in gene_names].index(symbol.upper())
+                        genes_to_modify.append(gene_names[idx])
+        else:
+            # Input are gene symbols - match directly
+            for gene in genes_to_perturb:
+                # Direct match
+                if gene in gene_names:
+                    genes_to_modify.append(gene)
+                # Try case-insensitive
+                elif gene.upper() in [g.upper() for g in gene_names]:
+                    idx = [g.upper() for g in gene_names].index(gene.upper())
+                    genes_to_modify.append(gene_names[idx])
+                # Try matching in var columns (gene_name, gene_symbol, etc.)
+                else:
+                    for col in perturbed_adata.var.columns:
+                        if gene in perturbed_adata.var[col].values:
+                            matched_genes = perturbed_adata.var[perturbed_adata.var[col] == gene].index
+                            genes_to_modify.extend(matched_genes.tolist())
+                            break
         
         if not genes_to_modify:
             raise ValueError(
@@ -118,7 +199,8 @@ class scGPTAdapter(PerturbationAdapter):
             raise ValueError(f"Unknown perturbation_type: {perturbation_type}")
         
         # Re-process perturbed data
-        perturbed_dataset = self.model.process_data(perturbed_adata, **kwargs)
+        gene_names_param = "gene_names" if "gene_names" in perturbed_adata.var.columns else "index"
+        perturbed_dataset = self.model.process_data(perturbed_adata, gene_names=gene_names_param, **kwargs)
         
         return perturbed_dataset
     
