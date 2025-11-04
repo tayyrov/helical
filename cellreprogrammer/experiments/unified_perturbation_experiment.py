@@ -74,6 +74,9 @@ def main():
                             "Limit cells only if you need faster testing or hit memory limits.")
     parser.add_argument("--fold-change", type=float, default=2.0,
                        help="Fold change for overexpression (not used by Geneformer)")
+    parser.add_argument("--geneformer-model", type=str, default="gf-20L-151M-i4096",
+                       help="Specific Geneformer model to use (e.g., 'gf-20L-151M-i4096', 'gf-12L-104M-i4096'). "
+                            "Only used when --model is 'geneformer'")
     
     args = parser.parse_args()
     
@@ -90,7 +93,7 @@ def main():
     
     # Prepare arguments for model-specific function
     kwargs = {
-        "model_name": args.model if args.model == "geneformer" else "scgpt",
+        "model_name": args.geneformer_model if args.model == "geneformer" else "scgpt",
         "data_path": args.data,
         "genes_to_perturb": args.genes,
         "random_genes": args.random,
