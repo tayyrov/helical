@@ -133,23 +133,22 @@ class Cell2SenAdapter(PerturbationAdapter):
             )
         
         # Convert genes to perturbation description
-        # Based on the tutorial, Cell2Sen expects simple perturbation names
-        # For gene-specific perturbations, we'll create a descriptive name
+        # Based on the tutorial, Cell2Sen expects simple perturbation names like "IFNg"
+        # The model may not understand "overexpress" format, so let's try just the gene names
+        # or a very simple format that the model might recognize
         if perturbation_type == "overexpress":
             if len(genes_to_perturb) == 1:
-                # Single gene: use format like "overexpress_POU5F1"
-                pert_text = f"overexpress_{genes_to_perturb[0]}"
+                # Single gene: try just the gene name first (like "IFNg" in tutorial)
+                pert_text = genes_to_perturb[0]
             else:
-                # Multiple genes: create a combined name
-                # Use underscore format similar to treatment names in the tutorial
-                genes_str = "_".join(genes_to_perturb)
-                pert_text = f"overexpress_{genes_str}"
+                # Multiple genes: try comma-separated gene names
+                # This is closer to natural language that the model might understand
+                pert_text = ", ".join(genes_to_perturb)
         elif perturbation_type == "knockdown":
             if len(genes_to_perturb) == 1:
-                pert_text = f"knockdown_{genes_to_perturb[0]}"
+                pert_text = genes_to_perturb[0]
             else:
-                genes_str = "_".join(genes_to_perturb)
-                pert_text = f"knockdown_{genes_str}"
+                pert_text = ", ".join(genes_to_perturb)
         else:
             raise ValueError(f"Unknown perturbation_type: {perturbation_type}")
         

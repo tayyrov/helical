@@ -413,11 +413,12 @@ class Cell2Sen(HelicalBaseFoundationModel):
                 
                 # Debug: Print token info for first batch, first item
                 if i == 0 and j == 0:
-                    LOGGER.info(f"DEBUG: Generated {len(generated_tokens)} tokens")
-                    LOGGER.info(f"DEBUG: First 10 token IDs: {generated_tokens[:10].tolist()}")
+                    print(f"DEBUG: Generated {len(generated_tokens)} tokens")
+                    print(f"DEBUG: First 10 token IDs: {generated_tokens[:10].tolist()}")
                     # Decode without skipping special tokens to see what's actually generated
                     decoded_with_special = self.tokenizer.decode(generated_tokens, skip_special_tokens=False)
-                    LOGGER.info(f"DEBUG: Decoded WITH special tokens (first 200 chars): {decoded_with_special[:200]}")
+                    print(f"DEBUG: Decoded WITH special tokens (first 200 chars): {decoded_with_special[:200]}")
+                    print(f"DEBUG: Decoded WITHOUT special tokens: {decoded[:200] if len(decoded) > 0 else '(empty)'}")
                 
                 # Decode as in the tutorial (skip_special_tokens=True)
                 decoded = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
