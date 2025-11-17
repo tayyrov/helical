@@ -60,6 +60,7 @@ def run_perturbation_experiment(
     model_size: str = "2B",
     use_quantization: bool = False,
     max_genes_per_cell: int = 5000,
+    batch_size: int = 1,
 ) -> pd.DataFrame:
     """
     Run Cell2Sen perturbation experiment using the adapter framework.
@@ -94,6 +95,9 @@ def run_perturbation_experiment(
         Maximum number of genes to use per cell (default: 5000)
         Lower values (e.g., 2000-3000) use less memory but may lose information
         This is critical for avoiding OOM errors with long cell sentences
+    batch_size : int
+        Batch size for processing (default: 1)
+        Processing one cell at a time avoids OOM. Increase only if you have sufficient GPU memory.
         
     Returns
     -------
@@ -114,9 +118,17 @@ def run_perturbation_experiment(
     device = get_device()
     
     # Create config and model
+    # Use small batch_size to avoid OOM - Cell2Sen processes long sequences (cell sentences)
+    # Even with 1000 genes, sequences are 4000+ tokens, so batch processing causes OOM
+    # Default to batch_size=1, but allow user to override via parameter
     print(f"Initializing Cell2Sen-{model_size}...")
+    print(f"  Using batch_size={batch_size} (processing {batch_size} cell(s) at a time)")
+    if batch_size > 1:
+        print(f"  ⚠ Warning: batch_size > 1 may cause OOM with long sequences")
+    if use_quantization:
+        print("  Using 4-bit quantization to reduce memory")
     config = Cell2SenConfig(
-        batch_size=16,
+        batch_size=batch_size,
         model_size=model_size,
         use_quantization=use_quantization,
     )
@@ -322,7 +334,9 @@ if __name__ == "__main__":
                        choices=["2B", "27B"],
                        help="Model size: 2B or 27B (default: 2B)")
     parser.add_argument("--use-quantization", action="store_true",
-                       help="Use 4-bit quantization (reduces memory usage)")
+                       help="Use 4-bit quantization (reduces memory usage, recommended for large datasets)")
+    parser.add_argument("--batch-size", type=int, default=1,
+                       help="Batch size for processing (default: 1, increase only if you have enough GPU memory)")
     parser.add_argument("--max-genes-per-cell", type=int, default=5000,
                        help="Maximum genes per cell (default: 5000, lower values use less memory)")
     
@@ -342,5 +356,6 @@ if __name__ == "__main__":
         model_size=args.model_size,
         use_quantization=args.use_quantization,
         max_genes_per_cell=args.max_genes_per_cell,
+        batch_size=args.batch_size,
     )
 
