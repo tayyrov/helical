@@ -47,7 +47,11 @@ class Cell2SenAdapter(PerturbationAdapter):
             
             if "gene_names" in adata_work.var.columns:
                 # Use gene_names as var_names
-                adata_work.var_names = adata_work.var["gene_names"].fillna(adata_work.var_names)
+                # Convert Index to Series for fillna compatibility
+                gene_names_series = adata_work.var["gene_names"].copy()
+                original_names_series = pd.Series(adata_work.var_names, index=adata_work.var.index)
+                gene_names_series = gene_names_series.fillna(original_names_series)
+                adata_work.var_names = gene_names_series.values
                 adata_work = adata_work[:, adata_work.var["gene_names"].notna()]
                 print(f"✓ Converted to gene symbols: {adata_work.n_vars} genes")
             else:
