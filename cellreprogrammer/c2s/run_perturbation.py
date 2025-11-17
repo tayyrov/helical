@@ -199,6 +199,10 @@ def run_perturbation_experiment(
     
     # Extract embeddings from perturbed sentences
     print("Extracting embeddings from perturbed sentences...")
+    # Debug: Check first few perturbed sentences
+    target_perturbed_sentences = perturbed_dataset['perturbed_cell_sentence']
+    print(f"  DEBUG: First target perturbed sentence (first 200 chars): {target_perturbed_sentences[0][:200] if target_perturbed_sentences[0] else 'None'}...")
+    
     perturbed_embeddings = adapter.extract_perturbed_embeddings(perturbed_dataset)
     
     # Filter to valid embeddings (non-NaN)
@@ -211,6 +215,7 @@ def run_perturbation_experiment(
     valid_goal_centroid = goal_centroid  # Single vector, no need to filter
     
     print(f"✓ Valid perturbed embeddings: {valid_perturbed_embeddings.shape[0]} / {len(perturbed_embeddings)}")
+    print(f"  DEBUG: First target embedding (first 10 values): {valid_perturbed_embeddings[0][:10]}")
     
     # Calculate shifts
     shifts = adapter.compute_shift(
@@ -223,12 +228,10 @@ def run_perturbation_experiment(
     print()
     
     # Test random genes
-    # IMPORTANT: Create a fresh copy of baseline_dataset to avoid reusing perturbed_cell_sentence column
-    # Remove any existing perturbed_cell_sentence column if present
-    baseline_dict = {col: baseline_dataset[col] for col in baseline_dataset.column_names}
-    if 'perturbed_cell_sentence' in baseline_dict:
-        del baseline_dict['perturbed_cell_sentence']
-    fresh_baseline_dataset = HFDataset.from_dict(baseline_dict)
+    # IMPORTANT: Reprocess baseline data from original AnnData to ensure completely fresh dataset
+    # This avoids any potential issues with shared state or cached columns
+    print("Reprocessing baseline data for random control (ensuring fresh dataset)...")
+    fresh_baseline_dataset = adapter.process_data(adata, max_genes_per_cell=max_genes_per_cell)
     
     print(f"Generating perturbed cell sentences for random control: {', '.join(random_genes)}")
     print(f"  Perturbation text: 'overexpress {', '.join(random_genes)}'")
@@ -240,6 +243,10 @@ def run_perturbation_experiment(
     )
     
     print("Extracting embeddings from random control perturbed sentences...")
+    # Debug: Check first few random perturbed sentences
+    random_perturbed_sentences = random_dataset['perturbed_cell_sentence']
+    print(f"  DEBUG: First random perturbed sentence (first 200 chars): {random_perturbed_sentences[0][:200] if random_perturbed_sentences[0] else 'None'}...")
+    
     random_embeddings = adapter.extract_perturbed_embeddings(random_dataset)
     
     # Filter to valid embeddings
@@ -249,6 +256,33 @@ def run_perturbation_experiment(
     
     valid_random_embeddings = random_embeddings[valid_random_mask]
     valid_random_baseline_embeddings = baseline_embeddings[valid_random_mask]
+    
+    print(f"  DEBUG: First random embedding (first 10 values): {valid_random_embeddings[0][:10]}")
+    print(f"  DEBUG: Target valid cells: {valid_mask.sum()}, Random valid cells: {valid_random_mask.sum()}")
+    print(f"  DEBUG: Masks are identical? {np.array_equal(valid_mask, valid_random_mask)}")
+    
+    # Compare embeddings for cells that are valid in both
+    if np.array_equal(valid_mask, valid_random_mask):
+        print(f"  DEBUG: Comparing {len(valid_perturbed_embeddings)} embeddings...")
+        print(f"  DEBUG: Are embeddings identical? {np.array_equal(valid_perturbed_embeddings, valid_random_embeddings)}")
+        if not np.array_equal(valid_perturbed_embeddings, valid_random_embeddings):
+            max_diff = np.max(np.abs(valid_perturbed_embeddings - valid_random_embeddings))
+            mean_diff = np.mean(np.abs(valid_perturbed_embeddings - valid_random_embeddings))
+            print(f"  DEBUG: Max difference: {max_diff:.6f}, Mean difference: {mean_diff:.6f}")
+        else:
+            print(f"  ⚠ WARNING: Embeddings are IDENTICAL! This suggests a bug.")
+    else:
+        # Compare only overlapping cells
+        overlap_mask = valid_mask & valid_random_mask
+        if overlap_mask.sum() > 0:
+            print(f"  DEBUG: Comparing {overlap_mask.sum()} overlapping cells...")
+            overlap_target = perturbed_embeddings[overlap_mask]
+            overlap_random = random_embeddings[overlap_mask]
+            print(f"  DEBUG: Are overlapping embeddings identical? {np.array_equal(overlap_target, overlap_random)}")
+            if not np.array_equal(overlap_target, overlap_random):
+                max_diff = np.max(np.abs(overlap_target - overlap_random))
+                mean_diff = np.mean(np.abs(overlap_target - overlap_random))
+                print(f"  DEBUG: Max difference: {max_diff:.6f}, Mean difference: {mean_diff:.6f}")
     
     random_shifts = adapter.compute_shift(
         valid_random_baseline_embeddings,
