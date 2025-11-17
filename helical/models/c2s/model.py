@@ -366,6 +366,11 @@ class Cell2Sen(HelicalBaseFoundationModel):
                 for org, pert, cs in zip(batch_organisms, batch_perturbs, batch_cells)
             ]
             
+            # Debug: Print first prompt for first batch
+            if i == 0:
+                print(f"DEBUG: First prompt (first 500 chars):\n{prompts[0][:500]}")
+                print(f"DEBUG: First perturbation text: '{batch_perturbs[0]}'")
+            
             inputs = self.tokenizer(
                 prompts,
                 return_tensors="pt",
@@ -413,12 +418,17 @@ class Cell2Sen(HelicalBaseFoundationModel):
                 
                 # Debug: Print token info for first batch, first item
                 if i == 0 and j == 0:
-                    print(f"DEBUG: Generated {len(generated_tokens)} tokens")
-                    print(f"DEBUG: First 10 token IDs: {generated_tokens[:10].tolist()}")
+                    print(f"\nDEBUG MODEL GENERATION:")
+                    print(f"  Generated {len(generated_tokens)} tokens")
+                    print(f"  First 20 token IDs: {generated_tokens[:20].tolist()}")
                     # Decode without skipping special tokens to see what's actually generated
                     decoded_with_special = self.tokenizer.decode(generated_tokens, skip_special_tokens=False)
-                    print(f"DEBUG: Decoded WITH special tokens (first 200 chars): {decoded_with_special[:200]}")
-                    print(f"DEBUG: Decoded WITHOUT special tokens: {decoded[:200] if len(decoded) > 0 else '(empty)'}")
+                    print(f"  Decoded WITH special tokens (first 500 chars): {decoded_with_special[:500]}")
+                    # Decode with special tokens skipped
+                    decoded = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
+                    print(f"  Decoded WITHOUT special tokens (first 500 chars): {decoded[:500] if len(decoded) > 0 else '(EMPTY)'}")
+                    print(f"  Final decoded length: {len(decoded)}")
+                    print()
                 
                 # Decode as in the tutorial (skip_special_tokens=True)
                 decoded = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
