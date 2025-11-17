@@ -87,7 +87,7 @@ def map_ensembl_ids_to_gene_symbols(
     return adata
 
 
-def convert_list_ensembl_ids_to_gene_symbols(ensembl_ids: List[str], species=human) -> List[Optional[str]]:
+def _load_static_ensembl_df() -> pd.DataFrame:
     """
     Load a static mapping table between gene names and ensembl ids for 'hsapiens'.
     This avoids having to call an unstable API endpoint from pybiomart.
