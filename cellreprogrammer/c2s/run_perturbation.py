@@ -59,6 +59,7 @@ def run_perturbation_experiment(
     fold_change: Optional[float] = None,
     model_size: str = "2B",
     use_quantization: bool = False,
+    max_genes_per_cell: int = 5000,
 ) -> pd.DataFrame:
     """
     Run Cell2Sen perturbation experiment using the adapter framework.
@@ -89,6 +90,10 @@ def run_perturbation_experiment(
         Model size: "2B" or "27B" (default: "2B")
     use_quantization : bool
         Whether to use 4-bit quantization (default: False)
+    max_genes_per_cell : int
+        Maximum number of genes to use per cell (default: 5000)
+        Lower values (e.g., 2000-3000) use less memory but may lose information
+        This is critical for avoiding OOM errors with long cell sentences
         
     Returns
     -------
@@ -149,7 +154,7 @@ def run_perturbation_experiment(
         import scanpy as sc
         sc.pp.subsample(goal_adata, n_obs=max_cells, random_state=42)
     
-    goal_dataset = adapter.process_data(goal_adata)
+    goal_dataset = adapter.process_data(goal_adata, max_genes_per_cell=max_genes_per_cell)
     goal_embeddings = adapter.extract_embeddings(goal_dataset)
     goal_centroid = np.mean(goal_embeddings, axis=0)
     print(f"✓ Goal state embeddings: {goal_embeddings.shape}")
@@ -157,7 +162,7 @@ def run_perturbation_experiment(
     
     # Process baseline data
     print("Processing baseline data...")
-    baseline_dataset = adapter.process_data(adata)
+    baseline_dataset = adapter.process_data(adata, max_genes_per_cell=max_genes_per_cell)
     baseline_embeddings = adapter.extract_embeddings(baseline_dataset)
     print(f"✓ Baseline embeddings: {baseline_embeddings.shape}")
     print()
@@ -318,6 +323,8 @@ if __name__ == "__main__":
                        help="Model size: 2B or 27B (default: 2B)")
     parser.add_argument("--use-quantization", action="store_true",
                        help="Use 4-bit quantization (reduces memory usage)")
+    parser.add_argument("--max-genes-per-cell", type=int, default=5000,
+                       help="Maximum genes per cell (default: 5000, lower values use less memory)")
     
     args = parser.parse_args()
     
@@ -334,5 +341,6 @@ if __name__ == "__main__":
         fold_change=args.fold_change,
         model_size=args.model_size,
         use_quantization=args.use_quantization,
+        max_genes_per_cell=args.max_genes_per_cell,
     )
 

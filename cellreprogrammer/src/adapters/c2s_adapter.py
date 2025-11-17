@@ -59,6 +59,19 @@ class Cell2SenAdapter(PerturbationAdapter):
         else:
             adata_work = adata
         
+        # Filter to top N genes per cell to avoid OOM from extremely long sequences
+        # Cell2Sen creates cell sentences from all genes, which can be 20k+ tokens
+        # This causes quadratic memory in attention masks
+        max_genes_per_cell = kwargs.get('max_genes_per_cell', 5000)
+        if adata_work.n_vars > max_genes_per_cell:
+            print(f"⚠ Filtering to top {max_genes_per_cell} genes per cell (to avoid OOM)")
+            print(f"  Original: {adata_work.n_vars} genes")
+            # Filter to top N most variable genes
+            import scanpy as sc
+            sc.pp.highly_variable_genes(adata_work, n_top_genes=max_genes_per_cell, flavor='seurat_v3')
+            adata_work = adata_work[:, adata_work.var['highly_variable']]
+            print(f"  Filtered: {adata_work.n_vars} genes")
+        
         # Process with Cell2Sen
         dataset = self.model.process_data(adata_work, **kwargs)
         self.processed_dataset = dataset
