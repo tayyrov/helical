@@ -394,6 +394,8 @@ class Cell2Sen(HelicalBaseFoundationModel):
                         torch._dynamo.config.disable = original_disable
                         torch._dynamo.config.suppress_errors = original_suppress
                 else:
+                    # Use greedy decoding as in the tutorial (do_sample=False)
+                    # The tutorial shows this works correctly
                     outputs = self.model.generate(
                         **inputs,
                         max_new_tokens=self.max_new_tokens,
@@ -408,6 +410,16 @@ class Cell2Sen(HelicalBaseFoundationModel):
                 # Extract only the generated tokens (skip the prompt)
                 input_length = input_lengths[j].item()
                 generated_tokens = output[input_length:]  # Only generated part
+                
+                # Debug: Print token info for first batch, first item
+                if i == 0 and j == 0:
+                    LOGGER.info(f"DEBUG: Generated {len(generated_tokens)} tokens")
+                    LOGGER.info(f"DEBUG: First 10 token IDs: {generated_tokens[:10].tolist()}")
+                    # Decode without skipping special tokens to see what's actually generated
+                    decoded_with_special = self.tokenizer.decode(generated_tokens, skip_special_tokens=False)
+                    LOGGER.info(f"DEBUG: Decoded WITH special tokens (first 200 chars): {decoded_with_special[:200]}")
+                
+                # Decode as in the tutorial (skip_special_tokens=True)
                 decoded = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
                 batch_perturbed.append(decoded.strip())
             
