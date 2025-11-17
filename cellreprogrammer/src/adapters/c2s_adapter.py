@@ -53,6 +53,9 @@ class Cell2SenAdapter(PerturbationAdapter):
                 gene_names_series = gene_names_series.fillna(original_names_series)
                 adata_work.var_names = gene_names_series.values
                 adata_work = adata_work[:, adata_work.var["gene_names"].notna()]
+                # Make var_names unique to avoid warnings (do this before filtering genes)
+                if adata_work.var_names.duplicated().any():
+                    adata_work.var_names_make_unique()
                 print(f"✓ Converted to gene symbols: {adata_work.n_vars} genes")
             else:
                 adata_work = adata
@@ -148,6 +151,11 @@ class Cell2SenAdapter(PerturbationAdapter):
         # Add fold change info if provided
         if fold_change:
             pert_text += f" by {fold_change}x"
+        
+        # Remove any existing perturbed_cell_sentence column to ensure fresh perturbations
+        # This is important when applying multiple perturbations to the same dataset
+        if 'perturbed_cell_sentence' in dataset.column_names:
+            dataset = dataset.remove_columns(['perturbed_cell_sentence'])
         
         # Create perturbation list (one per cell)
         perturbations_list = [pert_text] * len(dataset)

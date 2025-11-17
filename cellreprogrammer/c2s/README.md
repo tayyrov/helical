@@ -198,8 +198,11 @@ config = Cell2SenConfig(use_quantization=True)
 # Or use smaller model
 config = Cell2SenConfig(model_size="2B")
 
-# Or reduce batch size
-config = Cell2SenConfig(batch_size=8)
+# Or reduce batch size (default is 1, which is safest)
+config = Cell2SenConfig(batch_size=1)
+
+# Or reduce genes per cell
+# Use --max-genes-per-cell 2000 or lower
 ```
 
 ### No Valid Perturbed Sentences
@@ -210,10 +213,113 @@ config = Cell2SenConfig(batch_size=8)
 ### Slow Performance
 - Use 2B model instead of 27B
 - Enable quantization
-- Reduce batch size
+- Keep batch_size=1 (default, safest)
 - Use GPU if available
+- Reduce max_genes_per_cell (fewer genes = faster)
 
-## Example Output
+### Negative Shifts
+If you see negative shifts (cells moving AWAY from goal):
+
+1. **Check goal state**: Verify iPSC embeddings are correct
+   ```python
+   # Inspect goal embeddings
+   goal_embeddings = adapter.extract_embeddings(goal_dataset)
+   print(f"Goal embeddings shape: {goal_embeddings.shape}")
+   print(f"Goal embeddings mean: {goal_embeddings.mean(axis=0)[:10]}")
+   ```
+
+2. **Validate perturbation**: Check if generated sentences make sense
+   ```python
+   # Inspect generated sentences
+   perturbed_sentences = perturbed_dataset['perturbed_cell_sentence']
+   print(f"First perturbed sentence: {perturbed_sentences[0][:200]}...")
+   ```
+
+3. **Try different approach**: 
+   - Use different perturbation description
+   - Try smaller gene sets
+   - Compare with Geneformer/scGPT results
+
+4. **Understand generative nature**: Cell2Sen predicts what *might* happen, not what *should* happen. Results may differ from deterministic models.
+
+### Warnings
+
+**Duplicate Variable Names**:
+- Automatically handled by calling `var_names_make_unique()`
+- Safe to ignore if you see the warning briefly
+
+**CUDAGraph Dynamic Shapes**:
+- Performance optimization warning, not an error
+- Automatically suppressed in the script
+- Safe to ignore
+
+**TensorFloat32**:
+- Performance optimization warning, not an error  
+- Automatically suppressed in the script
+- Safe to ignore
+
+## Understanding the Perturbation Pipeline
+
+### What Happens Step-by-Step
+
+1. **Data Preparation**
+   - Loads AnnData with single-cell expression data
+   - Filters to starting cell state (e.g., Fibroblast)
+   - Converts Ensembl IDs → gene symbols (Cell2Sen requires symbols)
+   - Filters to top N highly variable genes (default: 5000, configurable)
+
+2. **Cell Sentence Creation**
+   - Cell2Sen converts expression data to "cell sentences"
+   - Genes are ranked by expression (highest = rank 1)
+   - Format: "GENE1 GENE2 GENE3 ..." (space-separated gene symbols)
+   - Example: "POU5F1 SOX2 NANOG KLF4 MYC ..."
+
+3. **Baseline Embedding Extraction**
+   - Processes cell sentences through Cell2Sen model
+   - Extracts cell embeddings (one per cell)
+   - Computes goal state centroid (mean of iPSC embeddings)
+
+4. **Perturbation Generation**
+   - Creates text description: "overexpress POU5F1, SOX2, KLF4, and MYC"
+   - Uses Cell2Sen's `get_perturbations()` method
+   - LLM generates NEW cell sentences representing perturbed state
+   - Example: Original "GENE1 GENE2 GENE3..." → Perturbed "POU5F1 SOX2 GENE1 GENE3..."
+
+5. **Perturbed Embedding Extraction**
+   - Processes generated perturbed sentences through model
+   - Extracts embeddings from perturbed sentences
+   - Compares with baseline and goal state
+
+6. **Shift Calculation**
+   - Computes cosine distance: baseline → goal, perturbed → goal
+   - Shift = baseline_distance - perturbed_distance
+   - **Positive shift**: Moved TOWARD goal (good!)
+   - **Negative shift**: Moved AWAY from goal (may indicate issue or unexpected behavior)
+
+### Understanding Negative Shifts
+
+**Why might shifts be negative?**
+
+1. **Generative Model Behavior**: Cell2Sen is generative - it predicts what *might* happen, not what *should* happen. The LLM may generate cell states that are biologically plausible but not necessarily closer to the goal.
+
+2. **Model Limitations**: The model was trained on diverse data but may not perfectly capture reprogramming dynamics. Generative models can produce unexpected outputs.
+
+3. **Goal State Representation**: The goal centroid (mean of iPSC embeddings) may not be the optimal reference point. Consider:
+   - Using a more specific iPSC subpopulation
+   - Using a different goal state representation
+   - Validating goal embeddings make biological sense
+
+4. **Perturbation Description**: The text-based perturbation ("overexpress X") may not translate perfectly to the model's understanding. The model interprets this through its training, which may differ from expected behavior.
+
+**What to do if shifts are negative:**
+
+- Check if both target and random are negative (both moving away)
+- Compare the magnitude: if target is less negative than random, that's still improvement
+- Try different perturbation descriptions
+- Validate that goal state embeddings are correct
+- Consider that generative models may need different interpretation than deterministic models
+
+### Example Output
 
 ```
 ================================================================================
@@ -225,41 +331,62 @@ Perturbation type: overexpress
 
 ✓ GPU detected: NVIDIA A100
 ✓ Model initialized
+  Using batch_size=1 (processing 1 cell(s) at a time)
 
 Loading data...
-✓ Loaded: 1000 cells × 2000 genes
-✓ Filtered to Fibroblast: 500 cells
-✓ Using all 500 cells
+✓ Loaded: 32138 cells × 32738 genes
+✓ Filtered to Fibroblast: 7079 cells
+⚠ Limiting to 50 cells
 
 Extracting goal state embeddings (iPSC)...
-✓ Goal state embeddings: (300, 2048)
+⚠ Filtering to top 1000 genes per cell (to avoid OOM)
+  Original: 23897 genes
+  Filtered: 1000 genes
+✓ Goal state embeddings: (50, 2304)
 
 Processing baseline data...
-✓ Baseline embeddings: (500, 2048)
+✓ Baseline embeddings: (50, 2304)
 
 Generating perturbed cell sentences for: POU5F1, SOX2, KLF4, MYC
   (This uses Cell2Sen's generative LLM to predict perturbed states)
-Extracting embeddings from perturbed sentences...
-✓ Valid perturbed embeddings: 485 / 500
-✓ Mean shift: +0.023456 ± 0.012345
+✓ Valid perturbed embeddings: 50 / 50
+✓ Mean shift: -0.583854 ± 0.030438
 
 Generating perturbed cell sentences for random control: GAPDH, ACTB, B2M
-Extracting embeddings from random control perturbed sentences...
-✓ Random mean shift: +0.001234 ± 0.008765
+✓ Random mean shift: -0.579106 ± 0.031102
 
 ================================================================================
 RESULTS SUMMARY
 ================================================================================
 
-When POU5F1, SOX2, KLF4, MYC were overexpressed 2.0x:
-  • Mean shift toward iPSC: +0.023456 ± 0.012345
-  • Random controls shift: +0.001234 ± 0.008765
+When POU5F1, SOX2, KLF4, MYC were overexpress:
+  • Mean shift toward iPSC: -0.583854 ± 0.030438
+  • Random controls shift: -0.579106 ± 0.031102
 
-✓ Target genes showed 19.00x better shift toward iPSC
-  compared to random controls (GAPDH, ACTB, B2M)
+⚠ Both target and random perturbations moved cells AWAY from iPSC
+  However, target genes (POU5F1, SOX2, KLF4, MYC) moved less away than random controls
+  Improvement: -0.004748 (target is 0.004748 closer than random)
+  Note: Negative shifts may indicate the perturbation approach needs adjustment
 
-Results saved to: results/c2s_experiment
+Results saved to: results/
 ```
+
+### Interpreting Results
+
+**Positive Shifts (Good)**:
+- `+0.05` or higher: Strong positive effect
+- `+0.01` to `+0.05`: Moderate positive effect
+- `+0.001` to `+0.01`: Weak but positive effect
+
+**Negative Shifts (Concerning)**:
+- Both target and random negative: May indicate model/approach issue
+- Target less negative than random: Still improvement, but weak
+- Target more negative than random: Unexpected, investigate
+
+**Key Metrics**:
+- **Improvement**: `target_mean - random_mean` (higher is better)
+- **Fold improvement**: `target_mean / random_mean` (only when both same sign)
+- **Standard deviation**: Lower = more consistent effects
 
 ## Citation
 

@@ -74,7 +74,8 @@ def format_perturbation_results(
     if fold_change:
         pert_desc = f"were {perturbation_type} {fold_change}x"
     else:
-        pert_desc = f"were {perturbation_type} (Geneformer perturbation)"
+        # Default description (works for Geneformer and other models)
+        pert_desc = f"were {perturbation_type}"
     
     print("=" * 80)
     print("RESULTS SUMMARY")
@@ -98,6 +99,16 @@ def format_perturbation_results(
         # Target negative, random positive - unexpected
         print(f"⚠ Unexpected: Target genes shift cells AWAY from {goal_state}, while random controls shift toward")
         print(f"  This may indicate an issue with the perturbation or analysis")
+    elif target_mean < 0 and random_mean < 0:
+        # Both negative - both moving away from goal
+        if improvement > 0:
+            print(f"⚠ Both target and random perturbations moved cells AWAY from {goal_state}")
+            print(f"  However, target genes ({', '.join(target_genes)}) moved less away than random controls")
+            print(f"  Improvement: {improvement:+.6f} (target is {abs(improvement):.6f} closer than random)")
+            print(f"  Note: Negative shifts may indicate the perturbation approach needs adjustment")
+        else:
+            print(f"✗ Both target and random perturbations moved cells AWAY from {goal_state}")
+            print(f"  Target genes did not show improvement over random controls")
     elif fold_improvement and fold_improvement > 1.0:
         # Same sign and meaningful fold improvement
         print(f"✓ Target genes showed {fold_improvement:.2f}x better shift toward {goal_state}")

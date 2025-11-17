@@ -9,6 +9,7 @@ described in natural language and the model generates new cell sentences.
 """
 
 import os
+import warnings
 from pathlib import Path
 from typing import List, Optional
 import numpy as np
@@ -16,7 +17,13 @@ import pandas as pd
 import torch
 import anndata as ad
 
+# Suppress CUDAGraph warnings (performance optimization, not an error)
+warnings.filterwarnings("ignore", message=".*CUDAGraph.*")
+# Suppress TensorFloat32 warnings (performance optimization)
+warnings.filterwarnings("ignore", message=".*TensorFloat32.*")
+
 from helical.models.c2s import Cell2Sen, Cell2SenConfig
+from datasets import Dataset as HFDataset
 
 # Import from src (cellreprogrammer directory should be in sys.path)
 import sys
@@ -182,6 +189,7 @@ def run_perturbation_experiment(
     # Test target genes
     print(f"Generating perturbed cell sentences for: {', '.join(genes_to_perturb)}")
     print("  (This uses Cell2Sen's generative LLM to predict perturbed states)")
+    print(f"  Perturbation text: 'overexpress {', '.join(genes_to_perturb)}'")
     perturbed_dataset = adapter.apply_perturbation(
         baseline_dataset,
         genes_to_perturb,
@@ -215,9 +223,17 @@ def run_perturbation_experiment(
     print()
     
     # Test random genes
+    # IMPORTANT: Create a fresh copy of baseline_dataset to avoid reusing perturbed_cell_sentence column
+    # Remove any existing perturbed_cell_sentence column if present
+    baseline_dict = {col: baseline_dataset[col] for col in baseline_dataset.column_names}
+    if 'perturbed_cell_sentence' in baseline_dict:
+        del baseline_dict['perturbed_cell_sentence']
+    fresh_baseline_dataset = HFDataset.from_dict(baseline_dict)
+    
     print(f"Generating perturbed cell sentences for random control: {', '.join(random_genes)}")
+    print(f"  Perturbation text: 'overexpress {', '.join(random_genes)}'")
     random_dataset = adapter.apply_perturbation(
-        baseline_dataset,
+        fresh_baseline_dataset,
         random_genes,
         perturbation_type=perturbation_type,
         fold_change=fold_change
