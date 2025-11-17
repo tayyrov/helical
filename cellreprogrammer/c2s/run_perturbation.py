@@ -202,6 +202,12 @@ def run_perturbation_experiment(
     # Debug: Check first few perturbed sentences
     target_perturbed_sentences = perturbed_dataset['perturbed_cell_sentence']
     print(f"  DEBUG: First target perturbed sentence (first 200 chars): {target_perturbed_sentences[0][:200] if target_perturbed_sentences[0] else 'None'}...")
+    print(f"  DEBUG: First target perturbed sentence (full, first cell): {target_perturbed_sentences[0] if target_perturbed_sentences[0] else 'None'}")
+    # Check if all sentences are the same
+    if len(set(target_perturbed_sentences[:5])) == 1:
+        print(f"  ⚠ WARNING: First 5 perturbed sentences are IDENTICAL!")
+    else:
+        print(f"  DEBUG: First 5 sentences are different (good)")
     
     perturbed_embeddings = adapter.extract_perturbed_embeddings(perturbed_dataset)
     
@@ -246,6 +252,14 @@ def run_perturbation_experiment(
     # Debug: Check first few random perturbed sentences
     random_perturbed_sentences = random_dataset['perturbed_cell_sentence']
     print(f"  DEBUG: First random perturbed sentence (first 200 chars): {random_perturbed_sentences[0][:200] if random_perturbed_sentences[0] else 'None'}...")
+    print(f"  DEBUG: First random perturbed sentence (full, first cell): {random_perturbed_sentences[0] if random_perturbed_sentences[0] else 'None'}")
+    # Compare with target
+    if target_perturbed_sentences[0] == random_perturbed_sentences[0]:
+        print(f"  ⚠ WARNING: Target and random perturbed sentences are IDENTICAL for first cell!")
+    else:
+        print(f"  DEBUG: Target and random sentences are different (good)")
+        print(f"  DEBUG: First 50 chars of target: {target_perturbed_sentences[0][:50] if target_perturbed_sentences[0] else 'None'}")
+        print(f"  DEBUG: First 50 chars of random: {random_perturbed_sentences[0][:50] if random_perturbed_sentences[0] else 'None'}")
     
     random_embeddings = adapter.extract_perturbed_embeddings(random_dataset)
     

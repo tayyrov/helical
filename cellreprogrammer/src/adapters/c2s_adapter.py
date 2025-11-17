@@ -160,6 +160,18 @@ class Cell2SenAdapter(PerturbationAdapter):
         # Create perturbation list (one per cell)
         perturbations_list = [pert_text] * len(dataset)
         
+        # Debug: Print first prompt to verify format
+        if len(dataset) > 0:
+            from helical.models.c2s.config import PERTURBATION_PROMPT
+            first_cell_sentence = dataset['cell_sentence'][0] if 'cell_sentence' in dataset.column_names else 'N/A'
+            first_organism = dataset['organism'][0] if 'organism' in dataset.column_names else 'human'
+            first_prompt = PERTURBATION_PROMPT.format(
+                organism=first_organism,
+                perturbation=pert_text,
+                cell_sentence=first_cell_sentence[:100] + "..." if len(first_cell_sentence) > 100 else first_cell_sentence
+            )
+            print(f"  DEBUG: First perturbation prompt (first 300 chars):\n{first_prompt[:300]}...")
+        
         # Use Cell2Sen's native get_perturbations method
         perturbed_dataset, perturbed_sentences = self.model.get_perturbations(
             dataset,
