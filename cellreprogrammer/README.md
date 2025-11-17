@@ -42,50 +42,95 @@ pip install -e .  # If you add a setup.py
 
 ## Quick Start
 
-### Basic Overexpression Experiment
+### Basic Overexpression Experiment (scGPT)
 
 ```python
 from cellreprogrammer.src.models.model_factory import ModelFactory
-from cellreprogrammer.src.perturbations.overexpression import OverexpressionPerturbation
+from cellreprogrammer.src.adapters import scGPTAdapter
 import anndata as ad
 
 # 1. Load a model using the factory
 factory = ModelFactory()
-model = factory.load_model(
-    "geneformer",
-    config_overrides={"model_name": "gf-12L-38M-i4096", "batch_size": 10}
-)
+model = factory.load_model("scgpt", config_overrides={"batch_size": 10})
 
-# 2. Load your data
+# 2. Create adapter
+adapter = scGPTAdapter(model, model.config)
+
+# 3. Load your data
 ann_data = ad.read_h5ad("your_data.h5ad")
 
-# 3. Create perturbation
-oe = OverexpressionPerturbation(
-    model=model,
-    perturbation_genes=["BRCA1", "TP53", "MYC"],
-    perturbation_strength=2.5  # 2.5x overexpression
+# 4. Process data
+dataset = adapter.process_data(ann_data)
+
+# 5. Apply perturbation (overexpress genes)
+perturbed_dataset = adapter.apply_perturbation(
+    dataset,
+    genes_to_perturb=["POU5F1", "SOX2", "KLF4", "MYC"],
+    perturbation_type="overexpress",
+    fold_change=2.0
 )
 
-# 4. Apply perturbation
-perturbed_dataset = oe.apply(ann_data)
-
-# 5. Compute embeddings
-embeddings = oe.compute_embeddings(perturbed_dataset)
-print(f"Embeddings shape: {embeddings.shape}")
+# 6. Extract embeddings
+baseline_embeddings = adapter.extract_embeddings(dataset)
+perturbed_embeddings = adapter.extract_embeddings(perturbed_dataset)
+print(f"Embeddings shape: {perturbed_embeddings.shape}")
 ```
 
-### Comparing Control vs Perturbed
+### Cell2Sen Generative Perturbation
 
 ```python
-# Process control data
-control_dataset = model.process_data(ann_data)
+from cellreprogrammer.src.models.model_factory import ModelFactory
+from cellreprogrammer.src.adapters import Cell2SenAdapter
+import anndata as ad
 
-# Apply perturbation
-perturbed_dataset = oe.apply(ann_data)
+# 1. Load Cell2Sen model
+factory = ModelFactory()
+model = factory.load_model("c2s", config_overrides={"model_size": "2B"})
 
-# Compare conditions
-results = oe.compare_conditions(control_dataset, perturbed_dataset)
-print(f"Distance between conditions: {results['distance']:.4f}")
+# 2. Create adapter
+adapter = Cell2SenAdapter(model, model.config)
+
+# 3. Load and process data
+ann_data = ad.read_h5ad("your_data.h5ad")
+dataset = adapter.process_data(ann_data)
+
+# 4. Apply text-based perturbation (generates new cell sentences)
+perturbed_dataset = adapter.apply_perturbation(
+    dataset,
+    genes_to_perturb=["POU5F1", "SOX2", "KLF4", "MYC"],
+    perturbation_type="overexpress",
+    fold_change=2.0  # Optional, for display in text
+)
+
+# 5. Extract embeddings from generated perturbed sentences
+perturbed_embeddings = adapter.extract_perturbed_embeddings(perturbed_dataset)
+print(f"Perturbed embeddings shape: {perturbed_embeddings.shape}")
+```
+
+### Running Full Perturbation Experiments
+
+Use the provided scripts for complete experiments with controls:
+
+```bash
+# scGPT perturbation
+python cellreprogrammer/scgpt/run_perturbation.py \
+    --data data/prepared_data.h5ad \
+    --genes POU5F1 SOX2 KLF4 MYC \
+    --random GAPDH ACTB B2M \
+    --output results/scgpt_experiment \
+    --start-state Fibroblast \
+    --goal-state iPSC \
+    --fold-change 2.0
+
+# Cell2Sen perturbation
+python cellreprogrammer/c2s/run_perturbation.py \
+    --data data/prepared_data.h5ad \
+    --genes POU5F1 SOX2 KLF4 MYC \
+    --random GAPDH ACTB B2M \
+    --output results/c2s_experiment \
+    --start-state Fibroblast \
+    --goal-state iPSC \
+    --model-size 2B
 ```
 
 ## Project Structure
@@ -118,15 +163,19 @@ cellreprogrammer/
 
 ## Available Models
 
-CellReprogrammer supports all models available through Helical's unified API:
+CellReprogrammer supports multiple models with native perturbation capabilities:
 
-| Model | Description | Use Case |
-|-------|-------------|----------|
-| **Geneformer** | Transformer for scRNA-seq | Cell state transitions, perturbation prediction |
-| **scGPT** | GPT-style model for cells | Cell type annotation, perturbation effects |
-| **UCE** | Universal Cell Embedding | General embeddings, comparisons |
-| **Helix-mRNA** | mRNA foundation model | mRNA-level perturbations |
-| **Mamba2-mRNA** | Mamba-architecture mRNA model | Long-sequence mRNA analysis |
+| Model | Perturbation Method | Description | Use Case |
+|-------|-------------------|-------------|----------|
+| **Geneformer** | Token-based (InSilicoPerturber) | Transformer for scRNA-seq | Cell state transitions, perturbation prediction |
+| **scGPT** | Expression modification (fold_change) | GPT-style model for cells | Cell type annotation, perturbation effects |
+| **Cell2Sen (C2S)** | Generative text-based | LLM-based generative model | Text-based perturbation, generative predictions |
+
+### Model-Specific Features
+
+- **Geneformer**: Uses native `InSilicoPerturber` utilities that move genes to front of tokenized sequence
+- **scGPT**: Modifies expression values directly (multiply by fold_change), then re-processes
+- **Cell2Sen**: Uses text-based perturbations (e.g., "overexpress POU5F1") to generate new cell sentences via LLM
 
 Add more models easily in `model_factory.py`!
 
@@ -229,8 +278,17 @@ CellReprogrammer integrates seamlessly with:
 - **Existing Helical workflows**: Drop-in replacement for custom code
 - **Your Geneformer experiments**: Migrate easily from standalone Geneformer
 
+## Model-Specific Documentation
+
+Each model has detailed documentation:
+
+- **Geneformer**: See `geneformer/` directory
+- **scGPT**: See `scgpt/` directory  
+- **Cell2Sen**: See `c2s/README.md` for detailed guide
+
 ## Future Roadmap
 
+- [x] Cell2Sen integration with native perturbation support
 - [ ] Additional perturbation types (knockdown, knockout, etc.)
 - [ ] Integration with more models as they're added to Helical
 - [ ] Visualization utilities for perturbation effects

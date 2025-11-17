@@ -13,6 +13,7 @@ import numpy as np
 # Import helical models
 from helical.models.geneformer import Geneformer, GeneformerConfig
 from helical.models.scgpt import scGPT, scGPTConfig
+from helical.models.c2s import Cell2Sen, Cell2SenConfig
 from helical.models.base_models import HelicalRNAModel
 
 # TODO: Add more models as needed
@@ -55,6 +56,16 @@ class ModelFactory:
                 "device": "cuda",
             },
             "description": "scGPT: Transformer-based model for single-cell data",
+        },
+        "c2s": {
+            "model_class": Cell2Sen,
+            "config_class": Cell2SenConfig,
+            "default_config": {
+                "batch_size": 16,
+                "model_size": "2B",
+                "use_quantization": False,
+            },
+            "description": "Cell2Sen: LLM-based generative model for single-cell data with native perturbation support",
         },
         # Add more models here as needed
     }
