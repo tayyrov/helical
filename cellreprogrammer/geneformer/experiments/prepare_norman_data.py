@@ -210,8 +210,22 @@ else:
 # Create perturbation/activation labels if needed
 # Try to identify activated vs non-activated cells
 if 'is_activated' not in adata.obs.columns:
-    # Look for common patterns
-    if 'perturbation' in adata.obs.columns:
+    # Look for common patterns - Norman dataset uses 'gene_program' with 'Ctrl' for controls
+    if 'gene_program' in adata.obs.columns:
+        # 'Ctrl' means control (non-activated), everything else is activated
+        adata.obs['is_activated'] = (adata.obs['gene_program'] != 'Ctrl').astype(int)
+        print("✓ Created is_activated from 'gene_program' column (Ctrl = non-activated)")
+    elif 'guide_identity' in adata.obs.columns or 'guide_merged' in adata.obs.columns:
+        # Use guide columns - empty/null/control guides = non-activated
+        guide_col = 'guide_merged' if 'guide_merged' in adata.obs.columns else 'guide_identity'
+        # Check for common control patterns
+        control_patterns = ['control', 'ctrl', 'none', 'empty', 'non-targeting', 'nt']
+        is_control = adata.obs[guide_col].astype(str).str.lower().isin(control_patterns) | \
+                     adata.obs[guide_col].isna() | \
+                     (adata.obs[guide_col].astype(str) == '')
+        adata.obs['is_activated'] = (~is_control).astype(int)
+        print(f"✓ Created is_activated from '{guide_col}' column")
+    elif 'perturbation' in adata.obs.columns:
         # Assume non-empty perturbation = activated
         adata.obs['is_activated'] = (~adata.obs['perturbation'].isna() & 
                                       (adata.obs['perturbation'] != '') &
@@ -233,7 +247,13 @@ if 'cell_type' not in adata.obs.columns:
 
 # Create perturbation_label for easier filtering
 if 'perturbation_label' not in adata.obs.columns:
-    if 'perturbation' in adata.obs.columns:
+    if 'guide_merged' in adata.obs.columns:
+        adata.obs['perturbation_label'] = adata.obs['guide_merged'].fillna('control')
+    elif 'guide_identity' in adata.obs.columns:
+        adata.obs['perturbation_label'] = adata.obs['guide_identity'].fillna('control')
+    elif 'gene_program' in adata.obs.columns:
+        adata.obs['perturbation_label'] = adata.obs['gene_program']
+    elif 'perturbation' in adata.obs.columns:
         adata.obs['perturbation_label'] = adata.obs['perturbation'].fillna('control')
     elif 'target_gene' in adata.obs.columns:
         adata.obs['perturbation_label'] = adata.obs['target_gene'].fillna('control')
@@ -270,10 +290,25 @@ if 'n_genes' not in adata.obs.columns:
     else:
         adata.obs['n_genes'] = (adata.X > 0).sum(axis=1)
 
-# Apply QC criteria
-min_genes = 200
-max_genes = 5000
-min_counts = 1000
+# Show distribution before filtering
+print("Data distribution before QC:")
+print(f"  n_genes: min={adata.obs['n_genes'].min()}, max={adata.obs['n_genes'].max()}, "
+      f"median={adata.obs['n_genes'].median():.1f}, mean={adata.obs['n_genes'].mean():.1f}")
+print(f"  n_counts: min={adata.obs['n_counts'].min()}, max={adata.obs['n_counts'].max()}, "
+      f"median={adata.obs['n_counts'].median():.1f}, mean={adata.obs['n_counts'].mean():.1f}")
+print(f"  Total genes in dataset: {adata.n_vars}")
+print()
+
+# Apply QC criteria - adjust based on dataset size
+# For Norman dataset with ~1700 genes, use more lenient criteria
+max_genes = min(adata.n_vars, 5000)  # Don't exceed total genes
+min_genes = max(50, int(adata.n_vars * 0.05))  # At least 5% of genes, minimum 50
+min_counts = 100  # Lower threshold for counts
+
+print(f"QC criteria:")
+print(f"  min_genes: {min_genes} (5% of {adata.n_vars} genes, minimum 50)")
+print(f"  max_genes: {max_genes} (total genes in dataset)")
+print(f"  min_counts: {min_counts}")
 
 # Update filter_pass based on QC criteria
 adata.obs['filter_pass'] = (
@@ -284,7 +319,6 @@ adata.obs['filter_pass'] = (
 
 n_pass = adata.obs['filter_pass'].sum()
 print(f"✓ Cells passing QC: {n_pass}/{adata.n_obs} ({n_pass/adata.n_obs*100:.1f}%)")
-print(f"  Criteria: {min_genes}-{max_genes} genes per cell, ≥{min_counts} counts")
 print()
 
 # =============================================================================
@@ -315,9 +349,9 @@ custom_attrs = {
     "perturbation_label": "perturbation_label",
 }
 
-# Add other columns if present
-for col in ["perturbation", "target_gene", "perturbation_type"]:
-    if col in adata.obs.columns:
+# Add other columns if present (prioritize Norman-specific columns)
+for col in ["guide_merged", "guide_identity", "gene_program", "perturbation", "target_gene", "perturbation_type"]:
+    if col in adata.obs.columns and col not in custom_attrs:
         custom_attrs[col] = col
 
 print(f"Metadata columns to preserve: {list(custom_attrs.keys())}")
