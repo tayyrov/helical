@@ -12,6 +12,10 @@ This folder contains Geneformer-specific experiment scripts for cell reprogrammi
 
 - **`test_oskm_combinations.py`**: Tests all 15 combinations of OSKM factors (OCT4, SOX2, KLF4, MYC) to identify optimal factor combinations.
 
+- **`prepare_norman_data.py`**: Prepares and tokenizes the Norman 2019 dataset (GSE118258) containing CRISPR-activated and non-activated K562 cells for Geneformer.
+
+- **`test_norman_dataset.py`**: Tests Geneformer's ability to distinguish between CRISPR-activated and non-activated cells from the Norman dataset, and evaluates perturbation effectiveness.
+
 ## Usage
 
 ```bash
@@ -26,6 +30,12 @@ python compare_all_models.py
 
 # Test all OSKM combinations
 python test_oskm_combinations.py
+
+# Prepare Norman dataset
+python prepare_norman_data.py
+
+# Test Norman dataset
+python test_norman_dataset.py
 ```
 
 ## Dependencies
