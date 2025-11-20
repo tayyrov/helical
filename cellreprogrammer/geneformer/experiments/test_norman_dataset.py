@@ -110,17 +110,24 @@ OUTPUT_DIR = CELLREPROGRAMMER_DIR / "results" / "norman_dataset"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Cell state definitions for Norman dataset
-# Use gene_program column which has categorical labels
-# 'Ctrl' = control/non-activated, other programs = activated
+# Based on Norman et al. 2019 paper - K562 cells can differentiate into multiple lineages
+# 'Ctrl' = control/non-activated
+# Goal states: different differentiation programs identified in the paper
+
+# Option 1: Test Ctrl → Erythroid (key finding in paper: CBL/CNN1 drives erythroid)
+# Option 2: Test Ctrl → Pro-growth (general activated state)
+# Option 3: Test Ctrl → Granulocyte/apoptosis (CEBPA/E driven)
+
+# Using Erythroid as goal state (most interesting biological result from paper)
 CELL_STATES = {
     "state_key": "gene_program",  # Use gene_program column
     "start_state": "Ctrl",  # Non-activated (control)
-    "goal_state": "Pro-growth",  # Activated - choose one representative program
-    "alt_states": ["Granulocyte/apoptosis", "Erythroid", "Pioneer factors", "Megakaryocyte", "G1 cell cycle arrest"]  # Other activation programs
+    "goal_state": "Erythroid",  # Target erythroid differentiation (CBL/CNN1 effect)
+    "alt_states": ["Pro-growth", "Granulocyte/apoptosis", "Pioneer factors", "Megakaryocyte", "G1 cell cycle arrest"]
 }
 
 FILTER_DATA = {
-    "gene_program": ["Ctrl", "Pro-growth", "Granulocyte/apoptosis", "Erythroid", "Pioneer factors", "Megakaryocyte", "G1 cell cycle arrest"]  # Include all
+    "gene_program": ["Ctrl", "Erythroid", "Pro-growth", "Granulocyte/apoptosis", "Pioneer factors", "Megakaryocyte", "G1 cell cycle arrest"]
 }
 
 # Computation settings
@@ -143,6 +150,12 @@ print("=" * 80)
 print("Norman Dataset Test with Geneformer")
 print("=" * 80)
 print()
+print("About the Norman 2019 dataset:")
+print("  • K562 chronic myeloid leukemia cells")
+print("  • CRISPRa (activation) perturbations, not knockdowns")
+print("  • ~27,658 cells across multiple differentiation programs")
+print("  • Key finding: CBL+CNN1 synergistically drive erythroid differentiation")
+print()
 print("Paths:")
 print(f"  Working directory: {CELLREPROGRAMMER_DIR}")
 print(f"  Model: {MODEL_NAME}")
@@ -152,9 +165,9 @@ print(f"  Output: {OUTPUT_DIR}")
 print()
 print("Cell states:")
 print(f"  Start: {CELL_STATES['start_state']} (control)")
-print(f"  Goal: {CELL_STATES['goal_state']} (activated)")
+print(f"  Goal: {CELL_STATES['goal_state']} (target differentiation state)")
 if CELL_STATES['alt_states']:
-    print(f"  Alternative activated states: {', '.join(CELL_STATES['alt_states'])}")
+    print(f"  Alternative states: {', '.join(CELL_STATES['alt_states'])}")
 print()
 print("Computational settings:")
 print(f"  Max cells: {MAX_NCELLS if MAX_NCELLS is not None else 'All available'}")
@@ -213,9 +226,9 @@ if emb_pickle.exists():
     with open(emb_pickle, 'rb') as f:
         embs_data = pickle.load(f)
     
-    if "Ctrl" in embs_data and "Pro-growth" in embs_data:
+    if "Ctrl" in embs_data and "Erythroid" in embs_data:
         non_activated_embs = embs_data["Ctrl"]
-        activated_embs = embs_data["Pro-growth"]
+        activated_embs = embs_data["Erythroid"]
         
         # Calculate mean embeddings
         if isinstance(non_activated_embs, dict):
@@ -257,34 +270,52 @@ print("=" * 80)
 # or known activation markers. Since we don't have specific target genes,
 # we'll test a few common activation-related genes
 
-# Common genes that might be involved in activation
-# These are examples - user should adjust based on their specific dataset
-# You can also load genes from the dataset's perturbation labels if available
-TEST_GENES = [
-    "ENSG00000139618",  # BRCA1 - often involved in cell cycle
-    "ENSG00000157764",  # BRAF - signaling
-    "ENSG00000141510",  # TP53 - tumor suppressor
-    "ENSG00000136997",  # MYC - proto-oncogene
-    "ENSG00000181449",  # SOX2 - transcription factor
-]
+# Key genes from Norman et al. 2019 paper
+# These genes were identified in the paper as having strong effects on cell state
+# Note: Norman dataset uses CRISPRa (activation), not knockdown
+NORMAN_KEY_GENES = {
+    "CBL": "ENSG00000110395",       # E3 ubiquitin ligase, erythroid differentiation
+    "CNN1": "ENSG00000130176",      # Calponin, synergistic with CBL for erythroid
+    "KLF1": "ENSG00000105610",      # Erythroid transcription factor
+    "GATA1": "ENSG00000102145",     # Erythroid master regulator
+    "CEBPA": "ENSG00000245848",     # Granulocyte differentiation
+    "CEBPE": "ENSG00000092067",     # Granulocyte differentiation
+    "SPI1": "ENSG00000066336",      # PU.1, granulocyte/monocyte
+    "ETS2": "ENSG00000157557",      # Transcription factor, MAPK pathway
+    "MAPK1": "ENSG00000100030",     # ERK2, kinase signaling
+    "DUSP9": "ENSG00000130829",     # Phosphatase, inhibits MAPK
+    "RUNX1": "ENSG00000159216",     # Hematopoietic transcription factor
+    "LYL1": "ENSG00000104903",      # Hematopoietic regulator
+}
 
-# Alternative: Load actual perturbed genes from the dataset if available
-# Uncomment and modify this section to use genes from the dataset:
-"""
-from datasets import load_from_disk
-dataset = load_from_disk(str(INPUT_DATA_PATH))
-if 'perturbation_label' in dataset.column_names:
-    # Extract unique perturbed genes (excluding 'control')
-    perturbed_genes = set()
-    for label in dataset['perturbation_label']:
-        if label and label != 'control' and label != '':
-            # Try to parse Ensembl ID from label
-            # Adjust parsing logic based on your dataset format
-            perturbed_genes.add(label)
-    if perturbed_genes:
-        TEST_GENES = list(perturbed_genes)[:10]  # Limit to top 10
-        print(f"Using {len(TEST_GENES)} genes from dataset perturbations")
-"""
+# Use genes from the Norman study
+TEST_GENES = list(NORMAN_KEY_GENES.values())
+
+print(f"Testing {len(TEST_GENES)} key genes from Norman et al. 2019:")
+for gene_name, ensembl_id in NORMAN_KEY_GENES.items():
+    print(f"  • {gene_name}: {ensembl_id}")
+print()
+
+# Alternative: Extract genes from the actual dataset's guide labels
+# This will identify which specific genes are in YOUR dataset
+print("Attempting to extract perturbed genes from dataset...")
+try:
+    from datasets import load_from_disk
+    dataset = load_from_disk(str(INPUT_DATA_PATH))
+    
+    # Extract unique guide targets from guide_merged column
+    if 'guide_merged' in dataset.column_names:
+        unique_guides = set(dataset['guide_merged'])
+        # Filter out 'ctrl' and other non-gene entries
+        gene_guides = [g for g in unique_guides if g and g.lower() not in ['ctrl', 'control', 'none', 'nan']]
+        print(f"Found {len(gene_guides)} unique gene perturbations in dataset:")
+        print(f"  Sample guides: {list(gene_guides)[:10]}")
+        print(f"  (Using predefined Norman key genes for testing)")
+        print()
+except Exception as e:
+    print(f"Could not load dataset guides: {e}")
+    print(f"Proceeding with Norman key genes")
+    print()
 
 # Alternative: test all genes from a specific perturbation if available
 # For now, we'll test individual genes and combinations
@@ -374,7 +405,7 @@ for i, gene_id in enumerate(TEST_GENES, 1):
                 shift_value = df['Shift_to_goal_end'].iloc[0]
                 results_list.append({
                     'Gene_ID': gene_id,
-                    'Shift_to_Activated': shift_value
+                    'Shift_to_Erythroid': shift_value
                 })
                 print(f"  ✓ Shift: {shift_value:.6f}")
             else:
@@ -392,8 +423,8 @@ for i, gene_id in enumerate(TEST_GENES, 1):
                         perturbation_data = pickle.load(f)
                     
                     shift_values = []
-                    if "Pro-growth" in perturbation_data:  # Goal state (activated)
-                        for key, values in perturbation_data["Pro-growth"].items():
+                    if "Erythroid" in perturbation_data:  # Goal state (erythroid differentiation)
+                        for key, values in perturbation_data["Erythroid"].items():
                             if isinstance(values, list):
                                 shift_values.extend(values)
                             elif isinstance(values, np.ndarray):
@@ -427,14 +458,14 @@ print()
 # =============================================================================
 
 print("=" * 80)
-print("STEP 4: Ranking results by activation shift")
+print("STEP 4: Ranking results by erythroid differentiation shift")
 print("=" * 80)
 
 if len(results_list) > 0:
     results_df = pd.DataFrame(results_list)
     
     # Sort by shift value (descending - higher shift = better)
-    results_df = results_df.sort_values('Shift_to_Activated', ascending=False)
+    results_df = results_df.sort_values('Shift_to_Erythroid', ascending=False)
     
     # Add rank
     results_df.insert(0, 'Rank', range(1, len(results_df) + 1))
@@ -443,11 +474,15 @@ if len(results_list) > 0:
     output_csv = OUTPUT_DIR / "norman_perturbation_results.csv"
     results_df.to_csv(output_csv, index=False)
     
-    print("\nTop genes by activation shift:")
+    print("\nTop genes by erythroid differentiation shift:")
+    print()
+    print("Expected from Norman et al. 2019:")
+    print("  • CBL and CNN1 should show strong erythroid shift (paper's key finding)")
+    print("  • KLF1 and GATA1 are canonical erythroid factors")
     print()
     for idx, row in results_df.head(10).iterrows():
         print(f"  Rank {row['Rank']}: {row['Gene_ID']}")
-        print(f"    Shift: {row['Shift_to_Activated']:.6f}")
+        print(f"    Shift: {row['Shift_to_Erythroid']:.6f}")
         print()
     
     print(f"\n✓ Results saved to: {output_csv}")
@@ -470,7 +505,7 @@ if emb_pickle.exists():
         with open(emb_pickle, 'rb') as f:
             embs_data = pickle.load(f)
         
-        if "Ctrl" in embs_data and "Pro-growth" in embs_data:
+        if "Ctrl" in embs_data and "Erythroid" in embs_data:
             print("✓ Baseline state separation calculated in Step 2")
             print("  Use embedding cosine similarity as baseline reference")
         else:
