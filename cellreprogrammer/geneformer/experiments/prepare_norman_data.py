@@ -248,15 +248,29 @@ if 'cell_type' not in adata.obs.columns:
 # Create perturbation_label for easier filtering
 if 'perturbation_label' not in adata.obs.columns:
     if 'guide_merged' in adata.obs.columns:
-        adata.obs['perturbation_label'] = adata.obs['guide_merged'].fillna('control')
+        # Convert categorical to string to avoid category issues
+        guide_vals = adata.obs['guide_merged'].astype(str)
+        adata.obs['perturbation_label'] = guide_vals.replace('nan', 'control').replace('None', 'control')
     elif 'guide_identity' in adata.obs.columns:
-        adata.obs['perturbation_label'] = adata.obs['guide_identity'].fillna('control')
+        # Convert categorical to string to avoid category issues
+        guide_vals = adata.obs['guide_identity'].astype(str)
+        adata.obs['perturbation_label'] = guide_vals.replace('nan', 'control').replace('None', 'control')
     elif 'gene_program' in adata.obs.columns:
-        adata.obs['perturbation_label'] = adata.obs['gene_program']
+        adata.obs['perturbation_label'] = adata.obs['gene_program'].astype(str)
     elif 'perturbation' in adata.obs.columns:
-        adata.obs['perturbation_label'] = adata.obs['perturbation'].fillna('control')
+        # Convert categorical to string if needed
+        if pd.api.types.is_categorical_dtype(adata.obs['perturbation']):
+            pert_vals = adata.obs['perturbation'].astype(str)
+            adata.obs['perturbation_label'] = pert_vals.replace('nan', 'control').replace('None', 'control')
+        else:
+            adata.obs['perturbation_label'] = adata.obs['perturbation'].fillna('control')
     elif 'target_gene' in adata.obs.columns:
-        adata.obs['perturbation_label'] = adata.obs['target_gene'].fillna('control')
+        # Convert categorical to string if needed
+        if pd.api.types.is_categorical_dtype(adata.obs['target_gene']):
+            target_vals = adata.obs['target_gene'].astype(str)
+            adata.obs['perturbation_label'] = target_vals.replace('nan', 'control').replace('None', 'control')
+        else:
+            adata.obs['perturbation_label'] = adata.obs['target_gene'].fillna('control')
     else:
         adata.obs['perturbation_label'] = adata.obs['is_activated'].map({1: 'activated', 0: 'control'})
     print("✓ Created perturbation_label")
