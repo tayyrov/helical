@@ -110,15 +110,17 @@ OUTPUT_DIR = CELLREPROGRAMMER_DIR / "results" / "norman_dataset"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Cell state definitions for Norman dataset
+# Use gene_program column which has categorical labels
+# 'Ctrl' = control/non-activated, other programs = activated
 CELL_STATES = {
-    "state_key": "is_activated",  # Use is_activated column
-    "start_state": 0,  # Non-activated (control)
-    "goal_state": 1,  # Activated (CRISPR)
-    "alt_states": []
+    "state_key": "gene_program",  # Use gene_program column
+    "start_state": "Ctrl",  # Non-activated (control)
+    "goal_state": "Pro-growth",  # Activated - choose one representative program
+    "alt_states": ["Granulocyte/apoptosis", "Erythroid", "Pioneer factors", "Megakaryocyte", "G1 cell cycle arrest"]  # Other activation programs
 }
 
 FILTER_DATA = {
-    "is_activated": [0, 1]  # Include both activated and non-activated
+    "gene_program": ["Ctrl", "Pro-growth", "Granulocyte/apoptosis", "Erythroid", "Pioneer factors", "Megakaryocyte", "G1 cell cycle arrest"]  # Include all
 }
 
 # Computation settings
@@ -149,8 +151,10 @@ print(f"  Data: {INPUT_DATA_PATH}")
 print(f"  Output: {OUTPUT_DIR}")
 print()
 print("Cell states:")
-print(f"  Start: Non-activated (is_activated=0)")
-print(f"  Goal: Activated (is_activated=1)")
+print(f"  Start: {CELL_STATES['start_state']} (control)")
+print(f"  Goal: {CELL_STATES['goal_state']} (activated)")
+if CELL_STATES['alt_states']:
+    print(f"  Alternative activated states: {', '.join(CELL_STATES['alt_states'])}")
 print()
 print("Computational settings:")
 print(f"  Max cells: {MAX_NCELLS if MAX_NCELLS is not None else 'All available'}")
@@ -209,9 +213,9 @@ if emb_pickle.exists():
     with open(emb_pickle, 'rb') as f:
         embs_data = pickle.load(f)
     
-    if 0 in embs_data and 1 in embs_data:
-        non_activated_embs = embs_data[0]
-        activated_embs = embs_data[1]
+    if "Ctrl" in embs_data and "Pro-growth" in embs_data:
+        non_activated_embs = embs_data["Ctrl"]
+        activated_embs = embs_data["Pro-growth"]
         
         # Calculate mean embeddings
         if isinstance(non_activated_embs, dict):
@@ -308,7 +312,7 @@ for i, gene_id in enumerate(TEST_GENES, 1):
             num_classes=0,
             emb_mode="cls",
             cell_emb_style="mean_pool",
-            filter_data={"is_activated": [0]},  # Start from non-activated cells
+            filter_data={"gene_program": ["Ctrl"]},  # Start from control cells
             cell_states_to_model=CELL_STATES,
             state_embs_dict=state_embs_dict,
             max_ncells=MAX_NCELLS,
@@ -388,8 +392,8 @@ for i, gene_id in enumerate(TEST_GENES, 1):
                         perturbation_data = pickle.load(f)
                     
                     shift_values = []
-                    if 1 in perturbation_data:  # Goal state (activated)
-                        for key, values in perturbation_data[1].items():
+                    if "Pro-growth" in perturbation_data:  # Goal state (activated)
+                        for key, values in perturbation_data["Pro-growth"].items():
                             if isinstance(values, list):
                                 shift_values.extend(values)
                             elif isinstance(values, np.ndarray):
@@ -466,7 +470,7 @@ if emb_pickle.exists():
         with open(emb_pickle, 'rb') as f:
             embs_data = pickle.load(f)
         
-        if 0 in embs_data and 1 in embs_data:
+        if "Ctrl" in embs_data and "Pro-growth" in embs_data:
             print("✓ Baseline state separation calculated in Step 2")
             print("  Use embedding cosine similarity as baseline reference")
         else:
