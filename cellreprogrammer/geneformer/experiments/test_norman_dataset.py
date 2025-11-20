@@ -23,12 +23,27 @@ from pathlib import Path
 
 # Path setup - works both locally and on remote server
 script_dir = Path(__file__).resolve().parent
-BASE_DIR = script_dir.parent.parent  # Go up to helical/
-# Fallback to remote server path if BASE_DIR doesn't exist
-if not BASE_DIR.exists():
-    BASE_DIR = Path("/home/ubuntu/data-at-virginia/helical")
+# Go up from experiments/ -> geneformer/ -> cellreprogrammer/
+CELLREPROGRAMMER_DIR = script_dir.parent.parent
 
-CELLREPROGRAMMER_DIR = BASE_DIR / "cellreprogrammer"
+# Verify we're in the right place by checking for data directory
+if not (CELLREPROGRAMMER_DIR / "data").exists():
+    # Try going up one more level to find helical/
+    potential_helical = CELLREPROGRAMMER_DIR.parent
+    if (potential_helical / "cellreprogrammer" / "data").exists():
+        CELLREPROGRAMMER_DIR = potential_helical / "cellreprogrammer"
+    else:
+        # Try common remote server paths
+        for base_path in [
+            Path("/home/ubuntu/data-at-virginia/helical"),
+            Path("/lambda/nfs/data-at-virginia/helical"),
+        ]:
+            test_cellreprogrammer = base_path / "cellreprogrammer"
+            if (test_cellreprogrammer / "data").exists():
+                CELLREPROGRAMMER_DIR = test_cellreprogrammer
+                break
+
+BASE_DIR = CELLREPROGRAMMER_DIR.parent
 
 # Import helical's GeneformerConfig and Downloader
 from helical.models.geneformer.geneformer_config import GeneformerConfig
