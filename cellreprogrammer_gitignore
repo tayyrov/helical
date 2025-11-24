@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Data files (don't commit large files)
+data/raw/*
+data/prepared/*
+data/tokenized/*
+results/*
+
+# Keep directory structure
+!data/raw/.gitkeep
+!data/prepared/.gitkeep
+!data/tokenized/.gitkeep
+!results/.gitkeep
+
+# Model files
+*.h5ad
+*.dataset
+*.npy
+*.pkl
+*.pickle
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation
+docs/_build/
+
+# Environment
+.env
+.envrc
+
+# Logs
+*.log
+wandb/
+
+
+

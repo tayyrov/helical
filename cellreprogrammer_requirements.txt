@@ -1,0 +1,34 @@
+# Cellreprogrammer Requirements
+# Install helical first: pip install helical
+
+# Core dependencies
+helical>=0.0.1
+torch>=2.0.0
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Single-cell analysis
+scanpy>=1.9.0
+anndata>=0.10.0
+zarr>=2.16.0
+crc32c>=2.3
+datasets>=2.14.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Machine learning
+scikit-learn>=1.3.0
+umap-learn>=0.5.0
+scipy>=1.11.0
+
+# Utilities
+tqdm>=4.65.0
+pyyaml>=6.0
+
+# Optional: for development
+pytest>=7.0
+black>=23.0
+flake8>=6.0
+
