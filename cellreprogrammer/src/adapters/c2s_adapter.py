@@ -182,6 +182,57 @@ class Cell2SenAdapter(PerturbationAdapter):
             perturbations_list=perturbations_list
         )
         
+        # Validate generated perturbations
+        # Check if perturbations are reasonable (not just special tokens or very short)
+        if perturbed_sentences:
+            # Find first non-None sentence for validation
+            first_valid_sentence = None
+            for s in perturbed_sentences:
+                if s is not None and len(s.strip()) > 0:
+                    first_valid_sentence = s
+                    break
+            
+            if first_valid_sentence:
+                # Count genes in the sentence (split by whitespace)
+                genes = first_valid_sentence.strip().split()
+                gene_count = len(genes)
+                sentence_length = len(first_valid_sentence)
+                
+                # Check if the sentence is suspiciously short or contains only special tokens
+                # Valid cell sentences should have many genes (typically 100+)
+                # If we only have 1-2 tokens, it's likely just a special token
+                is_suspicious = (
+                    gene_count <= 2 or  # Too few genes
+                    sentence_length < 20 or  # Too short
+                    first_valid_sentence.startswith('<') and first_valid_sentence.endswith('>')  # Looks like special token
+                )
+                
+                if is_suspicious:
+                    print("\n" + "=" * 80)
+                    print("ERROR: Invalid perturbation generation detected")
+                    print("=" * 80)
+                    print(f"Generated sentence: '{first_valid_sentence}'")
+                    print(f"Length: {gene_count} genes, {sentence_length} chars")
+                    print()
+                    print("The base Cell2Sen model is not generating proper perturbations.")
+                    print("This is because the base model is not finetuned for perturbation prediction.")
+                    print()
+                    print("SOLUTION:")
+                    print("You need to finetune the Cell2Sen model on perturbation data first.")
+                    print("See the tutorial for details:")
+                    print("  https://github.com/vandijklab/cell2sentence/blob/main/tutorials/c2s_tutorial_10_perturbation_response_prediction.ipynb")
+                    print()
+                    print("Alternatively:")
+                    print("  1. Use a pre-finetuned model if available")
+                    print("  2. Use Geneformer or scGPT for perturbation experiments (they work out-of-the-box)")
+                    print("=" * 80)
+                    print()
+                    raise ValueError(
+                        "Cell2Sen model generated invalid perturbations. "
+                        "The base model needs to be finetuned for perturbation prediction. "
+                        "See the error message above for details."
+                    )
+        
         return perturbed_dataset
     
     def get_gene_mapping(self) -> Dict[str, str]:
