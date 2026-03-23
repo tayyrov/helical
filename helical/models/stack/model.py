@@ -16,7 +16,7 @@ try:
     from stack.data.training.datasets import load_gene_list
     # Note: we might need more internal imports from stack for data processing
 except ImportError:
-    logging.getLogger(__name__).warning("Stack package not found. Please install it with 'pip install -e /path/to/stack'")
+    logging.getLogger(__name__).warning("Arc-Stack package not found. Please install it with 'pip install -e /path/to/arc-stack'")
 
 LOGGER = logging.getLogger(__name__)
 
