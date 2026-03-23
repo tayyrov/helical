@@ -9,6 +9,7 @@ from helical.models.stack.stack_config import StackConfig
 import pandas as pd
 from tqdm.auto import tqdm
 import os
+from pathlib import Path
 
 # Stack specific imports (assumes stack is installed)
 try:
@@ -56,6 +57,71 @@ class Stack(HelicalRNAModel):
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
             self.device = torch.device(device_str)
+
+        # Handle auto-download for checkpoints
+        checkpoint_path = self.config.get("checkpoint_path")
+        genelist_path = self.config.get("genelist_path")
+        repo_id = self.config.get("repo_id")
+
+        if (not checkpoint_path or not os.path.exists(checkpoint_path)) or \
+           (not genelist_path or not os.path.exists(genelist_path)):
+            if repo_id:
+                LOGGER.info(f"Checkpoint or genelist missing. Attempting to download from Hugging Face repo: {repo_id}...")
+                try:
+                    from huggingface_hub import snapshot_download
+                    from helical.constants.paths import CACHE_DIR_HELICAL
+                    
+                    # Use a model-specific cache directory
+                    model_dir = Path(CACHE_DIR_HELICAL) / "stack" / repo_id.replace("/", "_")
+                    model_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    download_path = snapshot_download(
+                        repo_id=repo_id,
+                        local_dir=model_dir,
+                        local_dir_use_symlinks=False
+                    )
+                    
+                    # Update paths if they weren't provided or didn't exist
+                    # Search for standard filenames if not explicitly hit
+                    possible_ckpt = Path(download_path) / "bc_large.ckpt"
+                    possible_genelist = Path(download_path) / "basecount_1000per_15000max.pkl"
+                    
+                    if not checkpoint_path or not os.path.exists(checkpoint_path):
+                        if possible_ckpt.exists():
+                            checkpoint_path = str(possible_ckpt)
+                        else:
+                            # Fallback: find first .ckpt
+                            ckpts = list(Path(download_path).glob("*.ckpt"))
+                            if ckpts:
+                                checkpoint_path = str(ckpts[0])
+                    
+                    if not genelist_path or not os.path.exists(genelist_path):
+                        if possible_genelist.exists():
+                            genelist_path = str(possible_genelist)
+                        else:
+                            # Fallback: find first .pkl
+                            pkls = list(Path(download_path).glob("*.pkl"))
+                            if pkls:
+                                genelist_path = str(pkls[0])
+                    
+                    if not checkpoint_path or not os.path.exists(checkpoint_path):
+                        raise FileNotFoundError(f"Could not find a .ckpt file in the downloaded repository: {download_path}")
+                    if not genelist_path or not os.path.exists(genelist_path):
+                        raise FileNotFoundError(f"Could not find a .pkl genelist in the downloaded repository: {download_path}")
+                    
+                    self.config["checkpoint_path"] = checkpoint_path
+                    self.config["genelist_path"] = genelist_path
+                    LOGGER.info(f"Using downloaded checkpoint: {checkpoint_path}")
+                    LOGGER.info(f"Using downloaded genelist: {genelist_path}")
+                    
+                except ImportError:
+                    LOGGER.error("huggingface_hub is required for auto-downloading Stack models. Please install it or provide local paths.")
+                    raise
+            else:
+                if not checkpoint_path or not os.path.exists(checkpoint_path):
+                    raise FileNotFoundError(f"Stack checkpoint not found and no repo_id provided for download: {checkpoint_path}")
+                if not genelist_path or not os.path.exists(genelist_path):
+                    raise FileNotFoundError(f"Stack genelist not found and no repo_id provided for download: {genelist_path}")
 
         LOGGER.info(f"Loading Stack model from {self.config['checkpoint_path']}...")
         

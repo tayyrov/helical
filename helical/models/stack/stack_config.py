@@ -31,16 +31,18 @@ class StackConfig:
 
     def __init__(
         self,
-        checkpoint_path: str,
-        genelist_path: str,
+        checkpoint_path: Optional[str] = None,
+        genelist_path: Optional[str] = None,
+        repo_id: str = "arcinstitute/Stack-Large-Aligned",
         batch_size: int = 32,
         device: Literal["cpu", "cuda", "auto"] = "auto",
         num_workers: int = 4,
-        model_class: Literal["scShiftAttentionModel", "ICLFinetunedModel", "ICL_FinetunedModel"] = "scShiftAttentionModel",
+        model_class: Literal["scShiftAttentionModel", "ICLFinetunedModel", "ICL__FinetunedModel"] = "scShiftAttentionModel",
     ):
         self.config = {
             "checkpoint_path": checkpoint_path,
             "genelist_path": genelist_path,
+            "repo_id": repo_id,
             "batch_size": batch_size,
             "device": device,
             "num_workers": num_workers,
