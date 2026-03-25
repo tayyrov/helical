@@ -168,6 +168,48 @@ class Stack(HelicalRNAModel):
         )
         return embeddings
 
+    def get_stable_embeddings(
+        self,
+        adata: Union[AnnData, str],
+        context_adata: Optional[AnnData] = None,
+        batch_size: Optional[int] = None,
+        **kwargs
+    ) -> np.ndarray:
+        """Extract embeddings using a stable context anchor to prevent neighborhood drift.
+        
+        If context_adata is provided, test cells will be embedded in the context of these cells.
+        Otherwise, it falls back to standard get_embeddings with local context.
+        """
+        if context_adata is None:
+            return self.get_embeddings(adata, batch_size=batch_size)
+            
+        batch_size = batch_size or self.config["batch_size"]
+        
+        # Ensure organism column exists
+        for a in [adata, context_adata]:
+            if isinstance(a, AnnData) and "organism" not in a.obs:
+                a.obs["organism"] = "human"
+                
+        LOGGER.info(f"Extracting STABLE embeddings using {context_adata.n_obs} context cells...")
+        
+        # Use get_incontext_prediction from the underlying stack model
+        # mode='latent' returns numpy array of embeddings for test cells
+        embeddings = self.model.get_incontext_prediction(
+            base_adata_or_path=context_adata,
+            test_adata_or_path=adata,
+            genelist_path=self.config["genelist_path"],
+            prompt_ratio=kwargs.get("prompt_ratio", 0.25),
+            context_ratio=kwargs.get("context_ratio", 0.4),
+            mode='latent',
+            gene_name_col=kwargs.get("gene_name_col"),
+            batch_size=batch_size,
+            num_workers=self.config["num_workers"],
+            random_seed=kwargs.get("random_seed", 0),
+            show_progress=True
+        )
+        
+        return embeddings
+
     def predict_perturbation(
         self,
         base_adata: AnnData,
