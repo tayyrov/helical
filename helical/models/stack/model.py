@@ -154,7 +154,7 @@ class Stack(HelicalRNAModel):
         # Ensure organism column exists if it's an AnnData object
         if isinstance(adata, AnnData):
             if "organism" not in adata.obs:
-                adata.obs["organism"] = "human"
+                adata.obs["organism"] = "Homo sapiens"
         
         LOGGER.info("Extracting embeddings using Stack...")
         
