@@ -151,10 +151,10 @@ class Stack(HelicalRNAModel):
         """Extract embeddings using Stack's latent representation method."""
         batch_size = batch_size or self.config["batch_size"]
         
-        # Ensure organism column exists if it's an AnnData object
-        if isinstance(adata, AnnData):
-            if "organism" not in adata.obs:
-                adata.obs["organism"] = "Homo sapiens"
+        # Force organism column to Homo sapiens for Stack validation
+        for a in [adata, context_adata]:
+            if isinstance(a, AnnData):
+                a.obs["organism"] = "Homo sapiens"
         
         LOGGER.info("Extracting embeddings using Stack...")
         
