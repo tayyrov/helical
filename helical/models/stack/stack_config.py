@@ -37,7 +37,7 @@ class StackConfig:
         batch_size: int = 32,
         device: Literal["cpu", "cuda", "auto"] = "auto",
         num_workers: int = 4,
-        model_class: Literal["scShiftAttentionModel", "ICLFinetunedModel", "ICL__FinetunedModel"] = "scShiftAttentionModel",
+        model_class: Literal["scShiftAttentionModel", "ICLFinetunedModel", "ICL_FinetunedModel"] = "scShiftAttentionModel",
     ):
         self.config = {
             "checkpoint_path": checkpoint_path,
