@@ -1,6 +1,7 @@
 from helical.models.base_models import HelicalRNAModel
 import logging
 import numpy as np
+import anndata as ad
 from anndata import AnnData
 import torch
 from typing import Union, List, Optional, Dict
@@ -194,6 +195,11 @@ class Stack(HelicalRNAModel):
         
         # Use get_incontext_prediction from the underlying stack model
         # mode='latent' returns numpy array of embeddings for test cells
+        
+        # Call obs_names_make_unique on the concatenated AnnData.
+        adata_combined = ad.concat([adata, context_adata], axis=0)
+        adata_combined.obs_names_make_unique()
+        
         embeddings = self.model.get_incontext_prediction(
             base_adata_or_path=context_adata,
             test_adata_or_path=adata,
