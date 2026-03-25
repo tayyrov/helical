@@ -204,21 +204,18 @@ class Stack(HelicalRNAModel):
         LOGGER.info(f"Extracting STABLE embeddings using {context_adata.n_obs} context cells...")
         
         # Call get_incontext_prediction from the underlying stack model
-        import warnings
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=UserWarning, module="anndata")
-            embeddings = self.model.get_incontext_prediction(
-                base_adata_or_path=context_adata,
-                test_adata_or_path=adata,
-                genelist_path=self.config.get("genelist_path"),
-                prompt_ratio=kwargs.get("prompt_ratio", 0.5),
-                context_ratio=kwargs.get("context_ratio", 0.5),
-                mode='latent',
-                batch_size=batch_size,
-                num_workers=self.config.get("num_workers", 0),
-                random_seed=kwargs.get("random_seed", 0),
-                show_progress=False
-            )
+        embeddings = self.model.get_incontext_prediction(
+            base_adata_or_path=context_adata,
+            test_adata_or_path=adata,
+            genelist_path=self.config.get("genelist_path"),
+            prompt_ratio=kwargs.get("prompt_ratio", 0.5),
+            context_ratio=kwargs.get("context_ratio", 0.5),
+            mode='latent',
+            batch_size=batch_size,
+            num_workers=self.config.get("num_workers", 0),
+            random_seed=kwargs.get("random_seed", 0),
+            show_progress=False
+        )
         
         return embeddings
 
