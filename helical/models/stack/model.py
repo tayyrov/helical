@@ -151,6 +151,11 @@ class Stack(HelicalRNAModel):
         """Extract embeddings using Stack's latent representation method."""
         batch_size = batch_size or self.config["batch_size"]
         
+        # Ensure organism column exists if it's an AnnData object
+        if isinstance(adata, AnnData):
+            if "organism" not in adata.obs:
+                adata.obs["organism"] = "human"
+        
         LOGGER.info("Extracting embeddings using Stack...")
         
         # model.get_latent_representation returns (embeddings, dataset_embeddings)
@@ -182,6 +187,11 @@ class Stack(HelicalRNAModel):
         # For now, let's assume we use the generation logic directly
         from stack.cli.generation import _run_incontext_generation
         
+        # Ensure organism column exists for both adatas
+        for a in [base_adata, test_adata]:
+            if "organism" not in a.obs:
+                a.obs["organism"] = "human"
+
         # Simplified wrapper for a single split/generation
         predictions, test_logit = _run_incontext_generation(
             model=self.model,
