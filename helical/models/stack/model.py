@@ -156,6 +156,11 @@ class Stack(HelicalRNAModel):
         for a in [adata, context_adata]:
             if isinstance(a, AnnData):
                 a.obs["organism"] = "Homo sapiens"
+                # Ensure unique obs_names to suppress anndata warnings during internal concat
+                # Each call to get_stable_embeddings should use a unique prefix to avoid collisions
+                import uuid
+                prefix = str(uuid.uuid4())[:8]
+                a.obs_names = [f"{prefix}_{i}" for i in range(a.n_obs)]
         
         LOGGER.info("Extracting embeddings using Stack...")
         
@@ -186,33 +191,34 @@ class Stack(HelicalRNAModel):
             
         batch_size = batch_size or self.config["batch_size"]
         
-        # Ensure organism column exists
-        for a in [adata, context_adata]:
-            if isinstance(a, AnnData) and "organism" not in a.obs:
-                a.obs["organism"] = "human"
+        # Force organism column to Homo sapiens for Stack validation
+        import uuid
+        prefix_a = f"test_{str(uuid.uuid4())[:8]}"
+        prefix_c = f"ctx_{str(uuid.uuid4())[:8]}"
+        
+        for a, prefix in zip([adata, context_adata], [prefix_a, prefix_c]):
+            if isinstance(a, AnnData):
+                a.obs["organism"] = "Homo sapiens"
+                a.obs_names = [f"{prefix}_{i}" for i in range(a.n_obs)]
                 
         LOGGER.info(f"Extracting STABLE embeddings using {context_adata.n_obs} context cells...")
         
-        # Use get_incontext_prediction from the underlying stack model
-        # mode='latent' returns numpy array of embeddings for test cells
-        
-        # Call obs_names_make_unique on the concatenated AnnData.
-        adata_combined = ad.concat([adata, context_adata], axis=0)
-        adata_combined.obs_names_make_unique()
-        
-        embeddings = self.model.get_incontext_prediction(
-            base_adata_or_path=context_adata,
-            test_adata_or_path=adata,
-            genelist_path=self.config["genelist_path"],
-            prompt_ratio=kwargs.get("prompt_ratio", 0.25),
-            context_ratio=kwargs.get("context_ratio", 0.4),
-            mode='latent',
-            gene_name_col=kwargs.get("gene_name_col"),
-            batch_size=batch_size,
-            num_workers=self.config["num_workers"],
-            random_seed=kwargs.get("random_seed", 0),
-            show_progress=True
-        )
+        # Call get_incontext_prediction from the underlying stack model
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning, module="anndata")
+            embeddings = self.model.get_incontext_prediction(
+                base_adata_or_path=context_adata,
+                test_adata_or_path=adata,
+                genelist_path=self.config.get("genelist_path"),
+                prompt_ratio=kwargs.get("prompt_ratio", 0.5),
+                context_ratio=kwargs.get("context_ratio", 0.5),
+                mode='latent',
+                batch_size=batch_size,
+                num_workers=self.config.get("num_workers", 0),
+                random_seed=kwargs.get("random_seed", 0),
+                show_progress=False
+            )
         
         return embeddings
 
