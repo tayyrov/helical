@@ -153,14 +153,12 @@ class Stack(HelicalRNAModel):
         batch_size = batch_size or self.config["batch_size"]
         
         # Force organism column to Homo sapiens for Stack validation
-        for a in [adata, context_adata]:
-            if isinstance(a, AnnData):
-                a.obs["organism"] = "Homo sapiens"
-                # Ensure unique obs_names to suppress anndata warnings during internal concat
-                # Each call to get_stable_embeddings should use a unique prefix to avoid collisions
-                import uuid
-                prefix = str(uuid.uuid4())[:8]
-                a.obs_names = [f"{prefix}_{i}" for i in range(a.n_obs)]
+        if isinstance(adata, AnnData):
+            adata.obs["organism"] = "Homo sapiens"
+            # Ensure unique obs_names to suppress anndata warnings during internal concat
+            import uuid
+            prefix = str(uuid.uuid4())[:8]
+            adata.obs_names = [f"emb_{prefix}_{i}" for i in range(adata.n_obs)]
         
         LOGGER.info("Extracting embeddings using Stack...")
         
@@ -198,6 +196,8 @@ class Stack(HelicalRNAModel):
         
         for a, prefix in zip([adata, context_adata], [prefix_a, prefix_c]):
             if isinstance(a, AnnData):
+                if not a.obs_names.is_unique:
+                    a.obs_names_make_unique()
                 a.obs["organism"] = "Homo sapiens"
                 a.obs_names = [f"{prefix}_{i}" for i in range(a.n_obs)]
                 
