@@ -241,7 +241,7 @@ class Stack(HelicalRNAModel):
         # Ensure organism column exists for both adatas
         for a in [base_adata, test_adata]:
             if "organism" not in a.obs:
-                a.obs["organism"] = "human"
+                a.obs["organism"] = "Homo sapiens"
 
         # Simplified wrapper for a single split/generation
         predictions, test_logit = _run_incontext_generation(
