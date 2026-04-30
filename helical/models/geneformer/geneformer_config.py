@@ -149,6 +149,12 @@ class GeneformerConfig:
                 "embsize": 512,
                 "model_version": "v1",
             },
+            "gf-20L-151M-i4096-custom": {
+                "input_size": 4096,
+                "special_token": True,
+                "embsize": 896,
+                "model_version": "v2",
+            },
         }
 
         if model_name not in self.model_map:
@@ -161,36 +167,44 @@ class GeneformerConfig:
                 f"Verson 1 Geneformer models do not support the CLS embedding mode"
             )
 
-        self.list_of_files_to_download = [
-            f"geneformer/{self.model_map[model_name]['model_version']}/gene_median_dictionary.pkl",
-            f"geneformer/{self.model_map[model_name]['model_version']}/token_dictionary.pkl",
-            f"geneformer/{self.model_map[model_name]['model_version']}/ensembl_mapping_dict.pkl",
-            f"geneformer/{self.model_map[model_name]['model_version']}/{model_name}/config.json",
-            f"geneformer/{self.model_map[model_name]['model_version']}/{model_name}/training_args.bin",
-        ]
-
-        # Add model weight files to download based on the model version (v1 or v2)
-        if (
-            self.model_map[model_name]["model_version"] != "v1"
-            or model_name == "gf-12L-40M-i2048-CZI-CellxGene"
-        ):
-            self.list_of_files_to_download.append(
-                f"geneformer/{self.model_map[model_name]['model_version']}/{model_name}/model.safetensors"
-            )
+        if model_name == "gf-20L-151M-i4096-custom":
+            self.list_of_files_to_download = []
         else:
-            self.list_of_files_to_download.append(
-                f"geneformer/{self.model_map[model_name]['model_version']}/{model_name}/pytorch_model.bin"
-            )
+            self.list_of_files_to_download = [
+                f"geneformer/{self.model_map[model_name]['model_version']}/gene_median_dictionary.pkl",
+                f"geneformer/{self.model_map[model_name]['model_version']}/token_dictionary.pkl",
+                f"geneformer/{self.model_map[model_name]['model_version']}/ensembl_mapping_dict.pkl",
+                f"geneformer/{self.model_map[model_name]['model_version']}/{model_name}/config.json",
+                f"geneformer/{self.model_map[model_name]['model_version']}/{model_name}/training_args.bin",
+            ]
+
+            # Add model weight files to download based on the model version (v1 or v2)
+            if (
+                self.model_map[model_name]["model_version"] != "v1"
+                or model_name == "gf-12L-40M-i2048-CZI-CellxGene"
+            ):
+                self.list_of_files_to_download.append(
+                    f"geneformer/{self.model_map[model_name]['model_version']}/{model_name}/model.safetensors"
+                )
+            else:
+                self.list_of_files_to_download.append(
+                    f"geneformer/{self.model_map[model_name]['model_version']}/{model_name}/pytorch_model.bin"
+                )
 
         self.model_dir = Path(CACHE_DIR_HELICAL, "geneformer")
 
-        self.files_config = {
-            "model_files_dir": Path(
+        if model_name == "gf-20L-151M-i4096-custom":
+             model_files_dir = Path("/home/atayyr/GitHub/cellreprogrammer/custom_models/geneformer/gf-20L-151M-i4096-custom")
+        else:
+             model_files_dir = Path(
                 CACHE_DIR_HELICAL,
                 "geneformer",
                 self.model_map[model_name]["model_version"],
                 model_name,
-            ),
+            )
+
+        self.files_config = {
+            "model_files_dir": model_files_dir,
             "gene_median_path": self.model_dir
             / self.model_map[model_name]["model_version"]
             / "gene_median_dictionary.pkl",
