@@ -4,8 +4,22 @@ import torch
 try:
     import numpy as np
     if hasattr(torch.serialization, "add_safe_globals"):
-        # Allow numpy scalars which are often present in older checkpoints
-        torch.serialization.add_safe_globals([np._core.multiarray.scalar])
+        # Expand allowed globals for PyTorch 2.6+ to support legacy checkpoints
+        safe_types = [np.dtype, np.ndarray]
+        
+        # Handle different numpy versions/structures for scalar types
+        try:
+            import numpy._core as np_core
+            safe_types.append(np_core.multiarray.scalar)
+            safe_types.append(np_core.multiarray._reconstruct)
+        except ImportError:
+            try:
+                safe_types.append(np.core.multiarray.scalar)
+                safe_types.append(np.core.multiarray._reconstruct)
+            except AttributeError:
+                pass
+                
+        torch.serialization.add_safe_globals(safe_types)
 except (ImportError, AttributeError):
     pass
 from pathlib import Path
