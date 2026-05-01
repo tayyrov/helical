@@ -28,6 +28,7 @@ class Geneformer(HelicalRNAModel):
     - gf-12L-38M-i4096
     - gf-12L-38M-i4096-CLcancer
     - gf-20L-151M-i4096
+    - gf-20L-151M-i4096-custom
 
     Version 3.0:
     - gf-12L-104M-i4096

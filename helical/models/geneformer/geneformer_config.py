@@ -61,6 +61,7 @@ class GeneformerConfig:
             "gf-20L-151M-i4096",
             "gf-18L-316M-i4096",
             "gf-12L-40M-i2048-CZI-CellxGene",
+            "gf-20L-151M-i4096-custom",
             # old models
             "gf-6L-30M-i2048",
             "gf-12L-30M-i2048",
@@ -194,7 +195,16 @@ class GeneformerConfig:
         self.model_dir = Path(CACHE_DIR_HELICAL, "geneformer")
 
         if model_name == "gf-20L-151M-i4096-custom":
-             model_files_dir = Path("/home/atayyr/GitHub/cellreprogrammer/custom_models/geneformer/gf-20L-151M-i4096-custom")
+            # Search for the custom model in multiple potential locations
+            potential_paths = [
+                Path("/home/atayyr/GitHub/cellreprogrammer/custom_models/geneformer/gf-20L-151M-i4096-custom"),
+                Path("/home/ubuntu/data-at-virginia/cellreprogrammer/custom_models/geneformer/gf-20L-151M-i4096-custom"),
+                Path("./custom_models/geneformer/gf-20L-151M-i4096-custom"),
+                Path("../custom_models/geneformer/gf-20L-151M-i4096-custom"),
+            ]
+            model_files_dir = next((p for p in potential_paths if p.exists()), potential_paths[0])
+            if not model_files_dir.exists():
+                LOGGER.warning(f"Custom model directory not found in any of the potential locations: {potential_paths}")
         else:
              model_files_dir = Path(
                 CACHE_DIR_HELICAL,
