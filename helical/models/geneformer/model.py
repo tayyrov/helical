@@ -100,6 +100,7 @@ class Geneformer(HelicalRNAModel):
             self.files_config["model_files_dir"],
             output_hidden_states=True,
             output_attentions=False,
+            weights_only=False,
         )
         self.model.eval()
         self.model = self.model.to(self.device)
