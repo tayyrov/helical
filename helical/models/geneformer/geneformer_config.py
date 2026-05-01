@@ -169,7 +169,12 @@ class GeneformerConfig:
             )
 
         if model_name == "gf-20L-151M-i4096-custom":
-            self.list_of_files_to_download = []
+            # Still need the shared v2 tokenizer/vocabulary files, just not the model weights
+            self.list_of_files_to_download = [
+                "geneformer/v2/gene_median_dictionary.pkl",
+                "geneformer/v2/token_dictionary.pkl",
+                "geneformer/v2/ensembl_mapping_dict.pkl",
+            ]
         else:
             self.list_of_files_to_download = [
                 f"geneformer/{self.model_map[model_name]['model_version']}/gene_median_dictionary.pkl",
