@@ -1,7 +1,14 @@
 from helical.models.base_models import HelicalRNAModel
 import logging
+import torch
+try:
+    import numpy as np
+    if hasattr(torch.serialization, "add_safe_globals"):
+        # Allow numpy scalars which are often present in older checkpoints
+        torch.serialization.add_safe_globals([np._core.multiarray.scalar])
+except (ImportError, AttributeError):
+    pass
 from pathlib import Path
-import numpy as np
 from anndata import AnnData
 from helical.utils.downloader import Downloader
 from transformers import BertForMaskedLM
